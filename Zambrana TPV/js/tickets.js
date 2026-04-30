@@ -100,9 +100,9 @@ export const tickets = {
                     --------------------------------<br>
                     ${itemsHtml}
                     --------------------------------<br>
-                    SUBTOTAL:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;${sub.padStart(6, '&nbsp;')}€<br>
-                    IVA (10%):&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;${iva.padStart(6, '&nbsp;')}€<br>
-                    TOTAL:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;${tot.padStart(6, '&nbsp;')}€<br>
+                    SUBTOTAL:              ${sub.padStart(6, ' ')}€<br>
+                    IVA (10%):             ${iva.padStart(6, ' ')}€<br>
+                    TOTAL:                 ${tot.padStart(6, ' ')}€<br>
                     --------------------------------<br>
                     MÉTODO DE PAGO: ${method.toUpperCase()}<br>
                     ================================<br>

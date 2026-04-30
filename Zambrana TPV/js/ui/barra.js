@@ -53,17 +53,14 @@ export function renderBarra(container, app) {
             const btnSendSelected = document.getElementById(`btn-send-sel-${order.id}`);
             if (btnSendSelected) {
                 btnSendSelected.addEventListener('click', () => {
-                    let hasPending = false;
+                    const readyIndices = [];
                     order.items.forEach((item, idx) => {
                         const check = document.getElementById(`check-${order.id}-${idx}`);
-                        if (check && check.checked) item.isReady = true;
-                        if (!item.isReady) hasPending = true;
+                        if (check && check.checked) readyIndices.push(idx);
                     });
                     
-                    if (!hasPending) {
-                        globalState.updateOrderStatus(order.id, 'listo');
-                    } else {
-                        globalState.createOrders([], [], {tableId: -1}); 
+                    if (readyIndices.length > 0) {
+                        globalState.splitOrderToReady(order.id, readyIndices);
                     }
                 });
             }

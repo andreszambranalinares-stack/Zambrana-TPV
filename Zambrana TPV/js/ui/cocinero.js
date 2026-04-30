@@ -102,20 +102,16 @@ export function renderCocinero(container, app) {
             const btnSendSelected = document.getElementById(`btn-send-sel-${order.id}`);
             if (btnSendSelected) {
                 btnSendSelected.addEventListener('click', () => {
-                    let hasPending = false;
+                    const readyIndices = [];
                     order.items.forEach((item, idx) => {
                         const check = document.getElementById(`check-${order.id}-${idx}`);
                         if (check && check.checked) {
-                            item.isReady = true;
+                            readyIndices.push(idx);
                         }
-                        if (!item.isReady) hasPending = true;
                     });
                     
-                    if (!hasPending) {
-                        globalState.updateOrderStatus(order.id, 'listo');
-                    } else {
-                        // Partial update: just save state so it updates UI. Orders state gets persisted.
-                        globalState.createOrders([], [], {tableId: -1}); // hack to trigger save and broadcast
+                    if (readyIndices.length > 0) {
+                        globalState.splitOrderToReady(order.id, readyIndices);
                     }
                 });
             }
