@@ -219,6 +219,33 @@ class State {
         }
     }
 
+    splitOrderToReady(orderId, readyItemIndices) {
+        const order = this.orders.find(o => o.id === orderId);
+        if (!order || readyItemIndices.length === 0) return;
+
+        if (readyItemIndices.length === order.items.length) {
+            order.items.forEach(i => i.isReady = true);
+            this.updateOrderStatus(orderId, 'listo');
+            return;
+        }
+
+        const readyItems = readyItemIndices.map(idx => ({...order.items[idx], isReady: true}));
+        const pendingItems = order.items.filter((_, idx) => !readyItemIndices.includes(idx));
+
+        const newOrder = {
+            ...order,
+            id: order.id + '_' + Date.now().toString().slice(-4),
+            items: readyItems,
+            status: 'listo',
+            readyAt: Date.now()
+        };
+
+        order.items = pendingItems;
+        this.orders.push(newOrder);
+        storage.saveState('orders', this.orders);
+        this.notifyListeners('orders');
+    }
+
     closeTable(tableId) {
         this.updateTable(tableId, { status: 'cerrada', guests: 0, name: '', openedAt: null });
         this.orders.forEach(o => {
