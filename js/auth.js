@@ -31,7 +31,7 @@ export const auth = {
 
         const html = `
             <div style="display:flex; flex-direction:column; gap:1rem;">
-                <p style="text-align:center; color:var(--color-text-muted);">Casa Pepa — Administración</p>
+                <p style="text-align:center; color:var(--color-text-muted);">Zambrana TPV — Administración</p>
                 <input type="text" id="admin-user" placeholder="Usuario" value="admin">
                 <div style="position:relative;">
                     <input type="password" id="admin-pass" placeholder="Contraseña" style="width:100%;">

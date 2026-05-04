@@ -3,23 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Casa Pepa TPV</title>
+    <title>Zambrana TPV</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#8B0000">
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
     <link rel="stylesheet" href="css/styles.css">
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍽️</text></svg>">
+    <link rel="icon" type="image/png" href="favicon.png">
 </head>
-<body class="theme-light">
+<body>
     <!-- Header/Nav -->
     <header id="main-header" class="hidden">
         <button id="btn-back-home" class="btn-icon" aria-label="Volver al inicio">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
         </button>
-        <h1 id="header-title">Casa Pepa</h1>
+        <h1 id="header-title">
+            <img src="logo.png" alt="Zambrana TPV" style="height: 28px; vertical-align: middle;">
+        </h1>
         <button id="btn-menu" class="btn-icon" aria-label="Menú">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
         </button>
@@ -40,31 +43,32 @@
             </button>
         </div>
         <nav class="sidebar-nav">
-            <button id="btn-toggle-theme" class="sidebar-item">
-                <span class="icon">🌙</span> <span class="text">Modo oscuro</span>
-            </button>
+
             <button id="btn-change-role" class="sidebar-item">
-                <span class="icon">🔁</span> Cambiar rol
+                <span class="icon"><i class='bx bx-transfer-alt'></i></span> Cambiar rol
             </button>
             <button id="btn-view-allergens" class="sidebar-item">
-                <span class="icon">⚠️</span> Alérgenos de la carta
+                <span class="icon"><i class='bx bx-error'></i></span> Alérgenos de la carta
             </button>
             <button id="btn-toggle-sound" class="sidebar-item">
-                <span class="icon">🔊</span> <span class="text">Sonido activado</span>
+                <span class="icon"><i class='bx bx-volume-full'></i></span> <span class="text">Sonido activado</span>
             </button>
             <button id="btn-about" class="sidebar-item">
-                <span class="icon">ℹ️</span> Acerca de
+                <span class="icon"><i class='bx bx-info-circle'></i></span> Acerca de
             </button>
 
-            <div id="admin-menu-section" style="display:none;">
+            <div id="admin-menu-section">
                 <div style="padding: 10px 15px; font-weight: bold; color: var(--color-text-muted); font-size: 0.8rem; margin-top: 10px; border-top: 1px solid var(--color-border);">
                     ── Admin ──
                 </div>
                 <button id="btn-admin-dashboard" class="sidebar-item admin-item">
-                    <span class="icon">📊</span> Panel de Control
+                    <span class="icon"><i class='bx bx-cog'></i></span> Panel de Control
                 </button>
                 <button id="btn-manage-carta" class="sidebar-item admin-item">
-                    <span class="icon">📖</span> Gestionar Carta
+                    <span class="icon"><i class='bx bx-book'></i></span> Gestionar Carta
+                </button>
+                <button id="btn-admin-devices" class="sidebar-item admin-item">
+                    <span class="icon"><i class='bx bx-devices'></i></span> Dispositivos
                 </button>
             </div>
         </nav>

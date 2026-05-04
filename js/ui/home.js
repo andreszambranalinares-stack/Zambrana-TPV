@@ -1,6 +1,8 @@
 import { globalState } from '../state.js';
 import { auth } from '../auth.js';
 import { showModal, closeModal } from './common.js';
+import { deviceManager } from '../device.js';
+import { storage } from '../storage.js';
 
 export function renderHome(container, app) {
     const isShiftOpen = globalState.shift.isOpen;
@@ -8,37 +10,37 @@ export function renderHome(container, app) {
     const kitchenPending = globalState.orders.filter(o => o.status === 'en_cocina').length;
     const barPending = globalState.orders.filter(o => o.status === 'en_barra').length;
 
-    let shiftInfo = `<div class="banner" style="background:var(--color-danger); color:white;">⚠️ No hay turno abierto — contacta con el administrador</div>`;
+    let shiftInfo = `<div class="banner" style="background:var(--color-danger); color:white;"><i class="bx bx-error-circle"></i> No hay turno abierto — contacta con el administrador</div>`;
     let disabledClass = 'disabled';
     
     if (isShiftOpen) {
         const d = new Date(globalState.shift.startTime);
-        shiftInfo = `<div style="color:var(--color-free); font-weight:bold; margin-bottom: 2rem;">🟢 Turno abierto desde ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}</div>`;
+        shiftInfo = `<div style="color:var(--color-free); font-weight:bold; margin-bottom: 2rem;"><i class="bx bxs-circle" style="font-size:0.8rem;vertical-align:middle;"></i> Turno abierto desde ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}</div>`;
         disabledClass = '';
     }
 
     const html = `
         <div class="home-view">
-            <h1>Casa Pepa</h1>
+            <img src="logo.png" alt="Zambrana TPV" style="height: 80px; max-width: 90%; object-fit: contain; margin-bottom: 1rem;">
             ${shiftInfo}
             <div class="role-cards ${disabledClass}">
                 <button class="role-card" id="role-camarero">
-                    <span class="icon">🍽️</span>
+                    <span class="icon"><i class="bx bx-restaurant"></i></span>
                     <span>Camarero</span>
                 </button>
                 <button class="role-card" id="role-cocinero">
                     ${kitchenPending > 0 ? `<div class="badge">${kitchenPending}</div>` : ''}
-                    <span class="icon">🧑‍🍳</span>
+                    <span class="icon"><i class="bx bx-bowl-hot"></i></span>
                     <span>Cocinero</span>
                 </button>
                 <button class="role-card" id="role-barra">
                     ${barPending > 0 ? `<div class="badge">${barPending}</div>` : ''}
-                    <span class="icon">🍺</span>
+                    <span class="icon"><i class="bx bx-drink"></i></span>
                     <span>Barra</span>
                 </button>
             </div>
-            <button id="role-admin" style="display:${auth.isAdmin() || (app.currentUser && app.currentUser.isAdmin) ? 'none' : 'block'}; position:fixed; bottom:1rem; left:1rem; background:transparent; color:var(--color-text-muted); padding:1rem; border:none; opacity:0.2; cursor:pointer; font-size:1.5rem; z-index:500;">
-                ⚙️
+            <button id="role-admin" title="Administración" style="display:${auth.isAdmin() || (app.currentUser && app.currentUser.isAdmin) ? 'none' : 'block'}; position:fixed; bottom:1rem; left:1rem; background:rgba(255,255,255,0.05); color:var(--color-text-muted); padding:0.8rem; border-radius:50%; border:1px solid var(--color-border); opacity:0.6; cursor:pointer; font-size:1.5rem; z-index:500;">
+                <i class="bx bx-cog"></i>
             </button>
         </div>
     `;
@@ -56,6 +58,7 @@ export function renderHome(container, app) {
 
         if (auth.isAdmin()) {
             app.currentUser = { id: 'admin', alias: 'Administrador', role: roleFilter, favCategory: '⭐', isAdmin: true };
+            deviceManager.linkEmployee('Administrador');
             app.navigate(viewDest);
             return;
         }
@@ -67,6 +70,7 @@ export function renderHome(container, app) {
 
         if (shiftEmps.length === 1 && viewDest === 'barra') {
             app.currentUser = shiftEmps[0];
+            deviceManager.linkEmployee(shiftEmps[0].alias);
             app.navigate(viewDest);
             return;
         }
@@ -89,6 +93,7 @@ export function renderHome(container, app) {
             const emp = shiftEmps.find(e => e.pin === pinStr);
             if (emp) {
                 app.currentUser = emp;
+                deviceManager.linkEmployee(emp.alias);
                 closeModal(modalId);
                 app.navigate(viewDest);
             }
@@ -104,6 +109,7 @@ export function renderHome(container, app) {
                 const emp = shiftEmps.find(e => e.id === id);
                 if (emp) {
                     app.currentUser = emp;
+                    deviceManager.linkEmployee(emp.alias);
                     closeModal(modalId);
                     app.navigate(viewDest);
                 }

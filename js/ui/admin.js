@@ -1,7 +1,8 @@
 import { globalState } from '../state.js';
 import { tickets } from '../tickets.js';
 import { storage } from '../storage.js';
-import { showModal, closeModal } from './common.js'; // Keep for simple prompts if needed, but avoid for main UI
+import { showModal, closeModal } from './common.js';
+import { deviceManager } from '../device.js';
 
 export function renderAdmin(container, app) {
     const render = () => {
@@ -9,11 +10,47 @@ export function renderAdmin(container, app) {
             <div style="padding: 1rem; max-width: 1200px; margin: 0 auto; padding-bottom: 5rem;">
                 <h2 style="margin-bottom: 1rem;">Panel de Administración</h2>
                 
+                <div class="dashboard-grid" style="margin-bottom: 2rem;">
+                    <div class="widget" id="sec-estado-servicio" style="grid-column: 1 / -1;">
+                        <h3>Estado del Servicio en Vivo</h3>
+                        <div style="display:flex; flex-wrap:wrap; gap:1rem; margin-top:1rem;">
+                            <div style="flex:1; min-width:150px; background:var(--color-bg); padding:1rem; border-radius:8px; text-align:center;">
+                                <div style="font-size:2rem; font-weight:bold; color:var(--color-primary);">${deviceManager.getQueue('queue_cocina').length}</div>
+                                <div>Comandas Cocina</div>
+                            </div>
+                            <div style="flex:1; min-width:150px; background:var(--color-bg); padding:1rem; border-radius:8px; text-align:center;">
+                                <div style="font-size:2rem; font-weight:bold; color:var(--color-primary);">${deviceManager.getQueue('queue_barra').length}</div>
+                                <div>Comandas Barra</div>
+                            </div>
+                            <div style="flex:1; min-width:150px; background:var(--color-bg); padding:1rem; border-radius:8px; text-align:center;">
+                                <div style="font-size:2rem; font-weight:bold; color:var(--color-free);">${globalState.tables.filter(t => t.status !== 'libre').length}</div>
+                                <div>Mesas Abiertas</div>
+                            </div>
+                            <div style="flex:1; min-width:150px; background:var(--color-bg); padding:1rem; border-radius:8px; text-align:center;">
+                                <div style="font-size:2rem; font-weight:bold;">${Object.values(deviceManager.getDevices()).filter(d => (Date.now() - d.last_seen) < 120000).length}</div>
+                                <div>Dispositivos Activos</div>
+                            </div>
+                            <div style="flex:1; min-width:150px; background:var(--color-bg); padding:1rem; border-radius:8px; text-align:center;">
+                                <div style="font-size:1.5rem; font-weight:bold;">${calculateAverageWaitTime()} min</div>
+                                <div>Espera Media</div>
+                            </div>
+                        </div>
+                        <div style="margin-top:1rem; padding-top:1rem; border-top:1px solid var(--color-border); display:flex; flex-wrap:wrap; gap:1rem;">
+                            <div style="flex:1; min-width:200px;">
+                                <strong>Estadísticas de Barra:</strong><br>
+                                Bebidas servidas: ${calculateBarraStats().servidas}<br>
+                                Bebidas pendientes: ${calculateBarraStats().pendientes}<br>
+                                Top ventas: <span style="color:var(--color-primary); font-weight:bold;">${calculateBarraStats().topVentas}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="dashboard-grid">
                     <div class="widget" id="sec-turno">
                         <h3>Estado del Turno</h3>
                         <div class="value" style="color: ${globalState.shift.isOpen ? 'var(--color-free)' : 'var(--color-danger)'};">
-                            ${globalState.shift.isOpen ? '🟢 Abierto' : '🔴 Cerrado'}
+                            ${globalState.shift.isOpen ? '<i class="bx bxs-circle" style="font-size:1rem;vertical-align:middle;"></i> Abierto' : '<i class="bx bxs-circle" style="font-size:1rem;vertical-align:middle;"></i> Cerrado'}
                         </div>
                         <div style="margin-top: 1rem;">
                             ${globalState.shift.isOpen 
@@ -30,16 +67,28 @@ export function renderAdmin(container, app) {
                         <div style="margin-top: 1rem; display:flex; flex-direction:column; gap:0.5rem;">
                             <label>Número de mesas totales:</label>
                             <input type="number" id="input-num-tables" value="${globalState.config.numTables}" min="1" max="50" style="padding:0.5rem;">
-                            <button class="btn btn-secondary" id="btn-table-editor">✏️ Editor de Plano</button>
+                            <label style="margin-top:0.5rem;">Asignar zona a mesas seleccionadas:</label>
+                            <div style="display:flex;gap:0.5rem;flex-wrap:wrap;" id="zone-assign-btns">
+                                ${globalState.tables.map(t=>`<label style="display:flex;align-items:center;gap:4px;font-size:0.85rem;"><input type="checkbox" class="zone-table-check" value="${t.id}"> M${String(t.id).padStart(2,'0')}</label>`).join('')}
+                            </div>
+                            <select id="zone-select" style="padding:0.5rem;">
+                                <option value="Salón">Salón</option>
+                                <option value="Terraza">Terraza</option>
+                                <option value="Barra">Barra</option>
+                                <option value="Privado">Privado</option>
+                            </select>
+                            <button class="btn btn-secondary" id="btn-assign-zone">Asignar Zona</button>
+                            <button class="btn btn-secondary" id="btn-table-editor"><i class="bx bx-edit-alt"></i> Editor de Plano</button>
                         </div>
                     </div>
+
                     
                     <div class="widget" id="sec-tickets">
                         <h3>Comandas (Hoy)</h3>
                         <div class="value">${tickets.getAllTickets().length}</div>
                         <div style="margin-top: 1rem;">
-                            <button class="btn btn-secondary" id="btn-tickets-archive" style="width:100%;">🖨️ Archivo Tickets</button>
-                            <button class="btn btn-secondary" id="btn-shift-history" style="width:100%; margin-top:0.5rem;">📚 Historial Turnos</button>
+                            <button class="btn btn-secondary" id="btn-tickets-archive" style="width:100%;"><i class="bx bx-printer"></i> Archivo Tickets</button>
+                            <button class="btn btn-secondary" id="btn-shift-history" style="width:100%; margin-top:0.5rem;"><i class="bx bx-history"></i> Historial Turnos</button>
                         </div>
                     </div>
 
@@ -81,12 +130,12 @@ export function renderAdmin(container, app) {
                                                 ${emp.alias}
                                             </td>
                                             <td style="padding:0.5rem;">${emp.role}</td>
-                                            <td style="padding:0.5rem;">${emp.isAdmin ? '✅ Sí' : '❌ No'}</td>
+                                            <td style="padding:0.5rem;">${emp.isAdmin ? '<i class="bx bx-check" style="color:var(--color-free);font-size:1.2rem;"></i> Sí' : '<i class="bx bx-x" style="color:var(--color-danger);font-size:1.2rem;"></i> No'}</td>
                                             <td style="padding:0.5rem;">${emp.pin}</td>
                                             <td style="padding:0.5rem; color:${emp.active ? 'var(--color-free)' : 'var(--color-danger)'};">${emp.active ? 'Activo' : 'Inactivo'}</td>
                                             <td style="padding:0.5rem;">
-                                                <button class="btn btn-secondary" style="padding:0.25rem 0.5rem; font-size:0.8rem;" onclick="window.editEmployee('${emp.id}')">✏️ Editar</button>
-                                                <button class="btn btn-secondary" style="padding:0.25rem 0.5rem; font-size:0.8rem; border-color:var(--color-danger); color:var(--color-danger);" onclick="if(confirm('¿Seguro que quieres eliminar a este empleado?')) window.deleteEmployee('${emp.id}')">🗑️ Eliminar</button>
+                                                <button class="btn btn-secondary" style="padding:0.25rem 0.5rem; font-size:0.8rem;" onclick="window.editEmployee('${emp.id}')"><i class="bx bx-edit"></i> Editar</button>
+                                                <button class="btn btn-secondary" style="padding:0.25rem 0.5rem; font-size:0.8rem; border-color:var(--color-danger); color:var(--color-danger);" onclick="if(confirm('¿Seguro que quieres eliminar a este empleado?')) window.deleteEmployee('${emp.id}')"><i class="bx bx-trash"></i> Eliminar</button>
                                             </td>
                                         </tr>
                                     `).join('')}
@@ -116,6 +165,18 @@ export function renderAdmin(container, app) {
         document.getElementById('btn-table-editor').addEventListener('click', renderTableEditor);
         document.getElementById('btn-tickets-archive').addEventListener('click', renderTicketsArchive);
         document.getElementById('btn-shift-history').addEventListener('click', renderShiftHistory);
+
+        const btnAssignZone = document.getElementById('btn-assign-zone');
+        if (btnAssignZone) {
+            btnAssignZone.addEventListener('click', () => {
+                const zone = document.getElementById('zone-select').value;
+                const checked = Array.from(document.querySelectorAll('.zone-table-check:checked')).map(c=>parseInt(c.value));
+                checked.forEach(id => globalState.updateTable(id, { zone }));
+                app.showToast(`Zona "${zone}" asignada a ${checked.length} mesas`);
+                render();
+            });
+        }
+
         
         document.getElementById('btn-save-alerts').addEventListener('click', () => {
             globalState.updateConfig({
@@ -128,6 +189,41 @@ export function renderAdmin(container, app) {
         });
 
         document.getElementById('btn-add-emp').addEventListener('click', () => openEmployeeForm());
+    };
+    
+    const calculateAverageWaitTime = () => {
+        const qC = deviceManager.getQueue('queue_cocina');
+        const qB = deviceManager.getQueue('queue_barra');
+        const all = [...qC, ...qB];
+        if (all.length === 0) return 0;
+        let total = 0;
+        all.forEach(o => total += (Date.now() - o.timestamp_entrada));
+        return Math.floor((total / all.length) / 60000);
+    };
+
+    const calculateBarraStats = () => {
+        const aB = deviceManager.getQueue('archive_barra');
+        const qB = deviceManager.getQueue('queue_barra');
+        let servidas = 0;
+        let pendientes = 0;
+        const counts = {};
+        
+        aB.forEach(o => o.items.forEach(i => {
+            servidas += i.qty;
+            counts[i.name] = (counts[i.name] || 0) + i.qty;
+        }));
+        qB.forEach(o => o.items.forEach(i => {
+            pendientes += i.qty;
+            counts[i.name] = (counts[i.name] || 0) + i.qty;
+        }));
+        
+        let top = 'Ninguna';
+        let max = 0;
+        for (const [name, qty] of Object.entries(counts)) {
+            if (qty > max) { max = qty; top = name; }
+        }
+        
+        return { servidas, pendientes, topVentas: top };
     };
 
     window.editEmployee = (id) => {
@@ -203,7 +299,7 @@ export function renderAdmin(container, app) {
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; margin:1rem 0; max-height:200px; overflow-y:auto;">
                     ${activeEmps.map(emp => `
                         <label style="display:flex; align-items:center; gap:0.5rem;">
-                            <input type="checkbox" class="shift-emp-check" value="${emp.id}">
+                            <input type="checkbox" class="shift-emp-check" value="${emp.id}" checked>
                             ${emp.alias} (${emp.role})
                         </label>
                     `).join('')}
@@ -300,7 +396,7 @@ export function renderAdmin(container, app) {
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 1rem; flex-wrap:wrap; gap:1rem;">
                     <h2>Editor de Plano de Mesas</h2>
                     <div style="display:flex; gap:0.5rem; align-items:center;">
-                        <button class="btn btn-secondary" id="btn-multi-select" style="background:var(--color-surface); border:1px solid var(--color-border); color:var(--color-text);">🔲 Multiselección: OFF</button>
+                        <button class="btn btn-secondary" id="btn-multi-select" style="background:var(--color-surface); border:1px solid var(--color-border); color:var(--color-text);"><i class='bx bx-checkbox'></i> Multiselección: OFF</button>
                         <button class="btn btn-secondary" id="btn-editor-cancel">Volver</button>
                         <button class="btn btn-primary" id="btn-editor-save">Guardar Plano</button>
                     </div>
@@ -320,7 +416,7 @@ export function renderAdmin(container, app) {
         const btnMulti = document.getElementById('btn-multi-select');
         btnMulti.addEventListener('click', () => {
             multiSelectMode = !multiSelectMode;
-            btnMulti.innerHTML = multiSelectMode ? '🔳 Multiselección: ON' : '🔲 Multiselección: OFF';
+            btnMulti.innerHTML = multiSelectMode ? '<i class="bx bx-checkbox-checked"></i> Multiselección: ON' : '<i class="bx bx-checkbox"></i> Multiselección: OFF';
             btnMulti.style.borderColor = multiSelectMode ? 'var(--color-primary)' : 'var(--color-border)';
             if (!multiSelectMode) {
                 selectedTables.clear();

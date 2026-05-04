@@ -40,7 +40,7 @@ export const tickets = {
             <div id="print-area">
                 <div class="print-header">
                     ================================<br>
-                    CASA PEPA<br>
+                    ZAMBRANA TPV<br>
                     Ticket de comanda<br>
                     ================================
                 </div>
@@ -90,7 +90,7 @@ export const tickets = {
             <div id="print-area">
                 <div class="print-header">
                     ================================<br>
-                    CASA PEPA<br>
+                    ZAMBRANA TPV<br>
                     TICKET DE COBRO<br>
                     ================================
                 </div>
@@ -109,7 +109,7 @@ export const tickets = {
                 </div>
                 <div class="print-footer">
                     ¡Gracias y hasta pronto!<br>
-                    Casa Pepa<br>
+                    Zambrana TPV<br>
                     ================================
                 </div>
             </div>
