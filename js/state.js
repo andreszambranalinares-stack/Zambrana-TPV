@@ -1,5 +1,6 @@
 import { storage } from './storage.js';
 import { defaultMenu } from './data.js';
+import { deviceManager } from './device.js';
 
 class State {
     constructor() {
@@ -46,7 +47,7 @@ class State {
         const tables = [];
         for (let i = 1; i <= num; i++) {
             tables.push({
-                id: i, status: 'libre', guests: 0, name: '', openedAt: null
+                id: i, status: 'libre', guests: 0, name: '', openedAt: null, zone: 'Salón'
             });
         }
         return tables;
@@ -67,14 +68,9 @@ class State {
 
     loadInitialEmployees() {
         const stored = storage.loadState('employees');
-        if (stored) return stored;
+        if (stored && stored.length > 0) return stored;
         return [
-            { id: 'e1', name: 'María', alias: 'María', role: 'Camarero', color: '#10B981', pin: '1111', active: true, favCategory: '⭐', isAdmin: true },
-            { id: 'e2', name: 'Carlos', alias: 'Carlos', role: 'Camarero', color: '#3B82F6', pin: '2222', active: true, favCategory: 'Carnes' },
-            { id: 'e3', name: 'Lucía', alias: 'Lucía', role: 'Camarero', color: '#8B5CF6', pin: '3333', active: true, favCategory: 'Bebidas' },
-            { id: 'e4', name: 'Paco', alias: 'Paco', role: 'Cocinero', color: '#F59E0B', pin: '4444', active: true },
-            { id: 'e5', name: 'Rafa', alias: 'Rafa', role: 'Cocinero', color: '#EF4444', pin: '5555', active: true },
-            { id: 'e6', name: 'Iván', alias: 'Iván', role: 'Barra', color: '#6366F1', pin: '6666', active: true }
+            { id: 'admin', name: 'Administrador', alias: 'Admin', role: 'Camarero', color: '#10B981', pin: '1234', active: true, favCategory: '⭐', isAdmin: true }
         ];
     }
 
@@ -181,6 +177,7 @@ class State {
                 status: 'en_cocina', items: kitchenItems.map(item => ({...item, isReady: false}))
             };
             this.orders.push(newOrderK);
+            deviceManager.addOrderToQueue('cocina', newOrderK.id, orderData, kitchenItems);
         }
         if (barItems.length > 0) {
             const newOrderB = {
@@ -190,6 +187,7 @@ class State {
                 status: 'en_barra', items: barItems.map(item => ({...item, isReady: false}))
             };
             this.orders.push(newOrderB);
+            deviceManager.addOrderToQueue('barra', newOrderB.id, orderData, barItems);
         }
         
         storage.saveState('orders', this.orders);
@@ -204,7 +202,13 @@ class State {
         const order = this.orders.find(o => o.id === orderId);
         if (order) {
             order.status = status;
-            if (status === 'listo' || status === 'servido') order.readyAt = Date.now();
+            if (status === 'listo' || status === 'servido') {
+                order.readyAt = Date.now();
+                if (status === 'listo') {
+                    // Mark in device manager
+                    deviceManager.markOrderReady(order.dest, order.id);
+                }
+            }
             storage.saveState('orders', this.orders);
             this.notifyListeners('orders');
         }
@@ -226,6 +230,7 @@ class State {
         if (readyItemIndices.length === order.items.length) {
             order.items.forEach(i => i.isReady = true);
             this.updateOrderStatus(orderId, 'listo');
+            // updateOrderStatus already handles deviceManager marking
             return;
         }
 
@@ -242,6 +247,7 @@ class State {
 
         order.items = pendingItems;
         this.orders.push(newOrder);
+        
         storage.saveState('orders', this.orders);
         this.notifyListeners('orders');
     }

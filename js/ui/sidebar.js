@@ -23,16 +23,7 @@ export function initSidebar(app) {
     if (btnCloseMenu) btnCloseMenu.addEventListener('click', toggleMenu);
     if (overlay) overlay.addEventListener('click', toggleMenu);
 
-    // Auth state visibility
-    const adminSection = document.getElementById('admin-menu-section');
-    const updateAdminVisibility = () => {
-        const hasAdminAccess = auth.isAdmin() || (app.currentUser && app.currentUser.isAdmin);
-        if (adminSection) adminSection.style.display = hasAdminAccess ? 'block' : 'none';
-    };
-    
-    // Subscribe to state to toggle visibility when auth changes
-    globalState.subscribe(() => updateAdminVisibility());
-    updateAdminVisibility();
+    // Auth state visibility logic removed to always show admin tools
 
     // Standard actions
     document.getElementById('btn-change-role').addEventListener('click', () => {
@@ -40,23 +31,39 @@ export function initSidebar(app) {
         app.navigate('home');
     });
 
-    document.getElementById('btn-toggle-theme').addEventListener('click', () => {
-        const current = globalState.config.theme || 'light';
-        const newTheme = current === 'light' ? 'dark' : 'light';
-        globalState.updateConfig({ theme: newTheme });
-        
-        document.body.className = `theme-${newTheme}`;
-        const icon = document.querySelector('#btn-toggle-theme .icon');
-        const text = document.querySelector('#btn-toggle-theme .text');
-        if (text) text.textContent = newTheme === 'light' ? 'Modo oscuro' : 'Modo claro';
-        if (icon) icon.textContent = newTheme === 'light' ? '🌙' : '☀️';
-    });
+
 
     const btnDash = document.getElementById('btn-admin-dashboard');
-    if (btnDash) btnDash.addEventListener('click', () => { toggleMenu(); app.navigate('admin'); });
+    if (btnDash) {
+        btnDash.addEventListener('click', () => {
+            toggleMenu();
+            if (auth.isAdmin() || (app.currentUser && app.currentUser.isAdmin)) {
+                app.openAdminDrawer('dashboard');
+            } else {
+                auth.showLoginModal(() => {
+                    app.openAdminDrawer('dashboard');
+                });
+            }
+        });
+    }
     
     const btnCarta = document.getElementById('btn-manage-carta');
-    if (btnCarta) btnCarta.addEventListener('click', () => { toggleMenu(); app.navigate('carta'); });
+    if (btnCarta) {
+        btnCarta.addEventListener('click', () => {
+            toggleMenu();
+            if (auth.isAdmin() || (app.currentUser && app.currentUser.isAdmin)) app.openAdminDrawer('carta');
+            else auth.showLoginModal(() => app.openAdminDrawer('carta'));
+        });
+    }
+    
+    const btnDevices = document.getElementById('btn-admin-devices');
+    if (btnDevices) {
+        btnDevices.addEventListener('click', () => {
+            toggleMenu();
+            if (auth.isAdmin() || (app.currentUser && app.currentUser.isAdmin)) app.openAdminDrawer('devices');
+            else auth.showLoginModal(() => app.openAdminDrawer('devices'));
+        });
+    }
 
     document.getElementById('btn-view-allergens').addEventListener('click', () => {
         toggleMenu();
@@ -68,13 +75,13 @@ export function initSidebar(app) {
         globalState.updateConfig({ soundEnabled });
         const icon = document.querySelector('#btn-toggle-sound .icon');
         const text = document.querySelector('#btn-toggle-sound .text');
-        if(icon) icon.textContent = soundEnabled ? '🔊' : '🔇';
+        if(icon) icon.innerHTML = soundEnabled ? "<i class='bx bx-volume-full'></i>" : "<i class='bx bx-volume-mute'></i>";
         if(text) text.textContent = soundEnabled ? 'Sonido activado' : 'Sonido silenciado';
     });
 
     document.getElementById('btn-about').addEventListener('click', () => {
         toggleMenu();
-        alert('Casa Pepa TPV v1.3\nDesarrollado para alta eficiencia en hostelería.');
+        alert('Zambrana TPV v1.4\nDesarrollado para alta eficiencia en hostelería.');
     });
 
     const btnLogout = document.getElementById('btn-logout');

@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zambrana TPV | El Futuro de la Hostelería</title>
+    <link rel="icon" type="image/png" href="favicon.png">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+    <style>
+        :root {
+            --primary: #8B0000;
+            --primary-hover: #b30000;
+            --dark: #121212;
+            --darker: #0a0a0a;
+            --light: #f5f5f5;
+            --gray: #888;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: var(--darker);
+            color: var(--light);
+            line-height: 1.6;
+        }
+
+        /* Nav */
+        nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1.5rem 5%;
+            background: rgba(18, 18, 18, 0.9);
+            backdrop-filter: blur(10px);
+            position: fixed;
+            width: 100%;
+            top: 0;
+            z-index: 100;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .logo span {
+            color: var(--primary);
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            align-items: center;
+        }
+
+        .nav-links a {
+            color: var(--light);
+            text-decoration: none;
+            font-weight: 600;
+            transition: color 0.3s;
+        }
+
+        .nav-links a:hover {
+            color: var(--primary);
+        }
+
+        .btn-main {
+            background: var(--primary);
+            color: white;
+            padding: 0.8rem 1.5rem;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s;
+            border: none;
+            cursor: pointer;
+        }
+
+        .btn-main:hover {
+            background: var(--primary-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(139, 0, 0, 0.4);
+        }
+
+        /* Hero */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 0 5%;
+            background: radial-gradient(circle at center, var(--dark) 0%, var(--darker) 100%);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            width: 600px;
+            height: 600px;
+            background: var(--primary);
+            border-radius: 50%;
+            filter: blur(150px);
+            opacity: 0.15;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 0;
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 1;
+            max-width: 800px;
+        }
+
+        .hero h1 {
+            font-size: 4.5rem;
+            font-weight: 800;
+            margin-bottom: 1.5rem;
+            line-height: 1.1;
+            letter-spacing: -1px;
+            background: linear-gradient(to right, #fff, #aaa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero p {
+            font-size: 1.2rem;
+            color: var(--gray);
+            margin-bottom: 2.5rem;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .hero-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+        }
+
+        .btn-outline {
+            background: transparent;
+            color: white;
+            padding: 0.8rem 1.5rem;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            border: 1px solid rgba(255,255,255,0.2);
+            transition: all 0.3s;
+        }
+
+        .btn-outline:hover {
+            border-color: white;
+            background: rgba(255,255,255,0.05);
+        }
+
+        /* Features */
+        .features {
+            padding: 8rem 5%;
+            background: var(--darker);
+        }
+
+        .section-title {
+            text-align: center;
+            font-size: 2.5rem;
+            margin-bottom: 4rem;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: var(--dark);
+            padding: 2.5rem;
+            border-radius: 16px;
+            border: 1px solid rgba(255,255,255,0.05);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            border-color: rgba(139, 0, 0, 0.5);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        .card-icon {
+            font-size: 2.5rem;
+            margin-bottom: 1.5rem;
+            display: inline-block;
+            background: rgba(139, 0, 0, 0.1);
+            padding: 1rem;
+            border-radius: 12px;
+            color: var(--primary);
+        }
+
+        .card h3 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            color: white;
+        }
+
+        .card p {
+            color: var(--gray);
+            font-size: 1rem;
+        }
+
+        /* CTA */
+        .cta {
+            padding: 6rem 5%;
+            text-align: center;
+            background: linear-gradient(45deg, var(--darker), #2a0000);
+            border-top: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .cta h2 {
+            font-size: 3rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .cta p {
+            color: var(--gray);
+            margin-bottom: 2rem;
+            font-size: 1.2rem;
+        }
+
+        /* Footer */
+        footer {
+            padding: 2rem 5%;
+            text-align: center;
+            color: var(--gray);
+            border-top: 1px solid rgba(255,255,255,0.05);
+            background: var(--darker);
+        }
+
+        @media (max-width: 768px) {
+            .hero h1 { font-size: 3rem; }
+            .nav-links { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <nav>
+        <div class="logo">
+            <img src="logo.png" alt="Zambrana TPV" style="height: 45px; vertical-align: middle;">
+        </div>
+        <div class="nav-links">
+            <a href="#caracteristicas">Características</a>
+            <a href="#beneficios">Beneficios</a>
+            <a href="index.html?demo=1" class="btn-main">Probar Demo</a>
+        </div>
+    </nav>
+
+    <section class="hero">
+        <div class="hero-content">
+            <h1>Control total de tu restaurante, en tiempo real.</h1>
+            <p>El sistema TPV más rápido, intuitivo y conectado del mercado. Olvídate de los servidores costosos. Diseñado para camareros, cocina y gerencia.</p>
+            <div class="hero-buttons">
+                <a href="index.html?demo=1" class="btn-main">Ver Demo en Vivo</a>
+                <a href="#caracteristicas" class="btn-outline">Descubrir más</a>
+            </div>
+        </div>
+    </section>
+
+    <section id="caracteristicas" class="features">
+        <h2 class="section-title">Tecnología diseñada para la velocidad</h2>
+        <div class="grid">
+            <div class="card">
+                <div class="card-icon"><i class='bx bx-mobile'></i></div>
+                <h3>Multi-Dispositivo</h3>
+                <p>Funciona en tablets, móviles y ordenadores. Los dispositivos se enlazan automáticamente mediante un simple código QR sin requerir complejas instalaciones.</p>
+            </div>
+            <div class="card">
+                <div class="card-icon"><i class='bx bx-bolt-circle'></i></div>
+                <h3>Comandas Instantáneas</h3>
+                <p>Lo que anota el camarero en la mesa aparece instantáneamente en la pantalla de la cocina o la barra. Sin cables, sin impresoras atascadas.</p>
+            </div>
+            <div class="card">
+                <div class="card-icon"><i class='bx bx-bar-chart'></i></div>
+                <h3>Control de Administración</h3>
+                <p>Panel de administración integrado con métricas en tiempo real. Tiempos medios de espera, mesas activas y rentabilidad de productos al instante.</p>
+            </div>
+            <div class="card">
+                <div class="card-icon"><i class='bx bx-moon'></i></div>
+                <h3>Diseño Inteligente</h3>
+                <p>Interfaz moderna con Modo Oscuro nativo pensado para reducir la fatiga visual del personal y adaptarse a ambientes con poca luz como bares o discotecas.</p>
+            </div>
+            <div class="card">
+                <div class="card-icon"><i class='bx bx-user'></i></div>
+                <h3>Gestión de Personal</h3>
+                <p>Identificación por PIN. Vinculación automática de dispositivo-empleado para un seguimiento perfecto de quién cobró qué y cuándo.</p>
+            </div>
+            <div class="card">
+                <div class="card-icon"><i class='bx bx-restaurant'></i></div>
+                <h3>Gestión Visual de Mesas</h3>
+                <p>Un editor de planos arrastrar y soltar (drag & drop) que te permite replicar la distribución real de tu salón y terraza en cuestión de segundos.</p>
+            </div>
+        </div>
+    </section>
+
+    <section class="cta">
+        <h2>¿Listo para modernizar tu negocio?</h2>
+        <p>Prueba Zambrana TPV ahora mismo. Sin registros, sin tarjetas de crédito.</p>
+        <a href="index.html?demo=1" class="btn-main" style="font-size: 1.2rem; padding: 1rem 2rem;">Acceder al TPV Demo</a>
+    </section>
+
+    <footer>
+        <p>&copy; 2026 Zambrana TPV. Todos los derechos reservados.</p>
+    </footer>
+
+    <script>
+        // Smooth scrolling
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                document.querySelector(this.getAttribute('href')).scrollIntoView({
+                    behavior: 'smooth'
+                });
+            });
+        });
+    </script>
+</body>
+</html>

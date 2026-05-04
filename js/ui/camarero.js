@@ -215,8 +215,6 @@ export function renderCamarero(container, app) {
             groups[sc].push(p);
         });
 
-        const adminMode = window.app && window.app.currentUser && window.app.currentUser.isAdmin || (window.auth && window.auth.isAdmin && window.auth.isAdmin());
-
         Object.keys(groups).sort().forEach(sc => {
             if (sc !== 'Otros') {
                 mContainer.insertAdjacentHTML('beforeend', `<h4 style="margin: 1rem 0 0.5rem 0; border-bottom:1px solid var(--color-border); color:var(--color-text-muted);">${sc.toUpperCase()}</h4>`);
@@ -237,22 +235,10 @@ export function renderCamarero(container, app) {
                     </div>
                     <div class="item-price">
                         ${item.price.toFixed(2)} €
-                        ${adminMode ? `<span class="admin-edit-price" style="cursor:pointer; font-size:0.8rem; margin-left:5px;">✏️</span>` : ''}
                     </div>
                 `;
                 
                 itemCard.addEventListener('click', (e) => {
-                    // Prevent normal flow if they clicked the edit price icon
-                    if (e.target.classList.contains('admin-edit-price')) {
-                        e.stopPropagation();
-                        const newPrice = prompt(`Nuevo precio para ${item.name}:`, item.price);
-                        if (newPrice !== null && !isNaN(parseFloat(newPrice))) {
-                            item.price = parseFloat(newPrice);
-                            globalState.updateMenu(globalState.menu);
-                            renderMenu(); // refresh
-                        }
-                        return;
-                    }
                     addItemToDraft(item);
                 });
                 itemsGrid.appendChild(itemCard);

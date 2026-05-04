@@ -1,13 +1,16 @@
 import { globalState } from './state.js';
 import { storage } from './storage.js';
 import { renderHome } from './ui/home.js';
-import { renderCamarero } from './ui/camarero.js';
+import { renderMobileCamarero as renderCamarero } from './ui/mobile_camarero.js';
+import { renderDesktop } from './ui/desktop.js';
 import { renderCocinero } from './ui/cocinero.js';
 import { renderBarra } from './ui/barra.js';
 import { renderAdmin } from './ui/admin.js';
 import { renderManageMenu } from './carta.js';
 import { initSidebar } from './ui/sidebar.js';
 import { auth } from './auth.js';
+import { deviceManager } from './device.js';
+import { initTour } from './tour.js';
 
 class App {
     constructor() {
@@ -58,6 +61,9 @@ class App {
         globalState.subscribe(() => {
             this.applyTheme(globalState.config.theme);
         });
+        
+        deviceManager.init();
+        initTour(this);
 
         // Event listeners
         this.btnBack.addEventListener('click', () => this.navigate('home'));
@@ -77,13 +83,16 @@ class App {
         // Shift timer update
         setInterval(() => {
             const timeEl = document.getElementById('shift-time');
-            if (timeEl && globalState.shiftStartTime) {
-                const diff = Math.floor((Date.now() - globalState.shiftStartTime) / 60000);
-                const h = Math.floor(diff / 60);
-                const m = diff % 60;
-                timeEl.textContent = `${h}h ${m}m en servicio`;
+            if (timeEl && globalState.shift.startTime && globalState.shift.isOpen) {
+                const diff = Math.floor((Date.now() - globalState.shift.startTime) / 1000);
+                const h = Math.floor(diff / 3600);
+                const m = Math.floor((diff % 3600) / 60).toString().padStart(2, '0');
+                const s = (diff % 60).toString().padStart(2, '0');
+                timeEl.textContent = `${h.toString().padStart(2, '0')}:${m}:${s}`;
+            } else if (timeEl) {
+                timeEl.textContent = '';
             }
-        }, 60000);
+        }, 1000);
 
         // Render initial view
         this.navigate('home');
@@ -103,45 +112,94 @@ class App {
         this.currentView = view;
         this.container.innerHTML = '';
         
-        if (view === 'home') {
+        if (view === 'camarero' || view === 'admin') {
             this.header.classList.add('hidden');
+        } else {
+            this.header.classList.remove('hidden');
+        }
+        this.btnBack.style.visibility = view === 'home' ? 'hidden' : 'visible';
+        
+        if (view === 'home') {
+            this.title.innerHTML = `<img src="logo.png" alt="Zambrana TPV" style="height: 28px; vertical-align: middle;">`;
             this.currentUser = null;
             renderHome(this.container, this);
         } else {
-            this.header.classList.remove('hidden');
             let userStr = this.currentUser ? ` — ${this.currentUser.alias}` : '';
             
             if (view === 'camarero') {
-                this.title.innerHTML = `🍽️ Sala${userStr} <span class="header-service-time" id="shift-time"></span>`;
+                this.title.innerHTML = `<i class='bx bx-restaurant'></i> Sala${userStr} <span class="header-service-time" id="shift-time"></span>`;
                 renderCamarero(this.container, this);
             } else if (view === 'cocinero') {
-                this.title.innerHTML = `🧑‍🍳 Cocina${userStr} <span class="header-service-time" id="shift-time"></span>`;
+                this.title.innerHTML = `<i class='bx bx-bowl-hot'></i> Cocina${userStr} <span class="header-service-time" id="shift-time"></span>`;
                 renderCocinero(this.container, this);
             } else if (view === 'barra') {
-                this.title.innerHTML = `🍺 Barra${userStr} <span class="header-service-time" id="shift-time"></span>`;
+                this.title.innerHTML = `<i class='bx bx-drink'></i> Barra${userStr} <span class="header-service-time" id="shift-time"></span>`;
                 renderBarra(this.container, this);
             } else if (view === 'admin') {
                 if (!auth.isAdmin() && !this.currentUser?.isAdmin) {
                     this.navigate('home');
                     return;
                 }
-                this.title.innerHTML = `⚙️ Administración`;
-                renderAdmin(this.container, this);
+                renderDesktop(this.container, this);
             } else if (view === 'carta') {
                 if (!auth.isAdmin() && !this.currentUser?.isAdmin) {
                     this.navigate('home');
                     return;
                 }
-                this.title.innerHTML = `📖 Gestionar Carta`;
+                this.title.innerHTML = `<i class='bx bx-book'></i> Gestionar Carta`;
                 renderManageMenu(this.container, this);
             }
             
             // Initial timer set
             const timeEl = document.getElementById('shift-time');
-            if (timeEl && globalState.shiftStartTime) {
-                const diff = Math.floor((Date.now() - globalState.shiftStartTime) / 60000);
-                timeEl.textContent = `${Math.floor(diff / 60)}h ${diff % 60}m en servicio`;
+            if (timeEl && globalState.shiftStartTime && globalState.shift.isOpen) {
+                const diff = Math.floor((Date.now() - globalState.shiftStartTime) / 1000);
+                const h = Math.floor(diff / 3600);
+                const m = Math.floor((diff % 3600) / 60).toString().padStart(2, '0');
+                const s = (diff % 60).toString().padStart(2, '0');
+                timeEl.textContent = `${h.toString().padStart(2, '0')}:${m}:${s}`;
+            } else if (timeEl) {
+                timeEl.textContent = '';
             }
+        }
+    }
+
+    openAdminDrawer(section) {
+        let drawer = document.getElementById('admin-drawer-overlay');
+        if (!drawer) {
+            drawer = document.createElement('div');
+            drawer.id = 'admin-drawer-overlay';
+            drawer.style.position = 'fixed';
+            drawer.style.top = '0';
+            drawer.style.left = '0';
+            drawer.style.width = '100vw';
+            drawer.style.height = '100vh';
+            drawer.style.backgroundColor = 'var(--color-bg)';
+            drawer.style.zIndex = '9999';
+            drawer.style.overflowY = 'auto';
+            document.body.appendChild(drawer);
+        }
+        drawer.innerHTML = `
+            <div style="position:sticky; top:0; background:var(--color-surface); padding:1rem; border-bottom:1px solid var(--color-border); display:flex; justify-content:space-between; align-items:center; z-index:10;">
+                <h2 style="margin:0;"><i class='bx bx-cog'></i> Administración</h2>
+                <button id="btn-close-admin-drawer" class="btn-icon"><i class='bx bx-x'></i></button>
+            </div>
+            <div id="admin-drawer-content" style="padding: 1rem;"></div>
+        `;
+        document.getElementById('btn-close-admin-drawer').addEventListener('click', () => {
+            drawer.style.display = 'none';
+            this.navigate(this.currentView);
+        });
+        drawer.style.display = 'block';
+        
+        const content = document.getElementById('admin-drawer-content');
+        if (section === 'dashboard') {
+            drawer.style.display = 'none';
+            this.navigate('admin');
+        } else if (section === 'carta') {
+            import('./carta.js').then(m => m.renderManageMenu(content, this));
+        } else if (section === 'devices') {
+            import('./ui/devices_admin.js').then(m => m.renderDevicesAdmin(content, this));
         }
     }
 
