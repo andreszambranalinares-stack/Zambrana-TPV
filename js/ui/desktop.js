@@ -58,11 +58,31 @@ export function renderDesktop(container, app) {
                         ${zones.map(z=>`<button class="tab-pill ${tableFilter===z?'active':''}" data-zone="${z}">${z}</button>`).join('')}
                     </div>
                 </div>
-                <div class="desktop-col-body">
-                    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:1rem;">
-                        ${tables}
+                <div class="desktop-col-body" style="padding:0;">
+                    <div style="display:grid; grid-template-columns:repeat(8, 1fr); grid-template-rows:repeat(6, 1fr); gap:10px; background:var(--color-bg); padding:1.5rem; border-radius:12px; height:500px; position:relative;">
+                        ${Array.from({length: 48}, (_, i) => {
+                            const t = globalState.tables.find(table => table.gridCell === i);
+                            if (!t) return `<div style="border:1px dashed var(--color-border); border-radius:8px; opacity:0.3;"></div>`;
+                            
+                            const isFiltered = tableFilter === 'Todas' || t.zone === tableFilter;
+                            let bg = 'var(--color-free)';
+                            let textColor = '#0D0D0D';
+                            if(t.status==='ocupada'||t.status==='enviada'){bg='var(--color-occupied)';textColor='white';}
+                            if(t.status==='reservada'){bg='var(--color-reserved)';textColor='#0D0D0D';}
+                            if(t.status==='cerrada'){bg='var(--color-closed)';textColor='white';}
+                            
+                            const order = globalState.orders.find(o=>o.tableId===t.id&&o.status!=='pagado');
+                            const total = order ? order.items.reduce((s,i)=>s+i.price*i.qty,0).toFixed(2) : '';
+                            
+                            return `
+                            <div class="mobile-table-card" style="background:${bg}; color:${textColor}; opacity:${isFiltered?1:0.2}; transform:scale(${isFiltered?1:0.9}); cursor:pointer; grid-column:${(i%8)+1}; grid-row:${Math.floor(i/8)+1}; flex-direction:column; gap:2px; height:100%; border:2px solid ${isFiltered?'var(--color-primary)':'transparent'};" data-table-id="${t.id}">
+                                <span style="font-size:1.1rem;font-weight:800;">${String(t.id).padStart(2,'0')}</span>
+                                ${total ? `<span style="font-size:0.7rem;opacity:0.85;">${total}€</span>` : ''}
+                                ${t.guests ? `<span style="font-size:0.65rem;opacity:0.7;"><i class='bx bx-user'></i>${t.guests}</span>` : ''}
+                            </div>`;
+                        }).join('')}
                     </div>
-                    <div style="margin-top:1.5rem;padding-top:1rem;border-top:1px solid var(--color-border);display:flex;gap:1.5rem;font-size:0.8rem;flex-wrap:wrap;">
+                    <div style="margin-top:1.5rem;padding:0 1rem;display:flex;gap:1.5rem;font-size:0.8rem;flex-wrap:wrap;">
                         <div><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--color-free);margin-right:4px;"></span>Libre</div>
                         <div><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--color-occupied);margin-right:4px;"></span>Ocupada</div>
                         <div><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--color-reserved);margin-right:4px;"></span>Reservada</div>
@@ -218,20 +238,18 @@ export function renderDesktop(container, app) {
             btn.addEventListener('mouseenter', () => { btn.style.borderColor = 'var(--color-primary)'; btn.style.background = 'var(--color-surface-hover)'; });
             btn.addEventListener('mouseleave', () => { btn.style.borderColor = 'var(--color-border)'; btn.style.background = 'var(--color-bg)'; });
             btn.addEventListener('click', () => {
-                const method = btn.dataset.method.toUpperCase();
-                import('../tickets.js').then(({ tickets }) => {
-                    const allItems = orders.flatMap(o => o.items);
-                    tickets.addTicket({
-                        type: 'cobro', tableId, waiter: app.currentUser?.alias || 'Admin',
-                        total, method,
-                        htmlContent: `<div>Mesa ${tableId} | ${method} | ${total.toFixed(2)}€</div>`
-                    });
-                    orders.forEach(o => globalState.updateOrderStatus(o.id, 'pagado'));
-                    globalState.updateTable(tableId, { status: 'libre', guests: 0, openedAt: null });
-                    overlay.remove();
-                    app.showToast(`✅ Mesa ${tableId} cobrada — ${total.toFixed(2)} € (${method})`);
-                    render();
-                });
+                const method = btn.dataset.method;
+                const table = globalState.tables.find(t => t.id === tableId);
+                
+                // Generar e imprimir ticket oficial
+                tickets.printCobro(table, orders, total, method);
+                
+                // Cerrar mesa y marcar comandas como pagadas
+                globalState.closeTable(tableId);
+                
+                overlay.remove();
+                app.showToast(`✅ Mesa ${tableId} cobrada — ${total.toFixed(2)} € (${method})`);
+                render();
             });
         });
 

@@ -1,7 +1,8 @@
 import { globalState } from './state.js';
 import { storage } from './storage.js';
 import { renderHome } from './ui/home.js';
-import { renderMobileCamarero as renderCamarero } from './ui/mobile_camarero.js';
+import { renderCamarero as renderDesktopCamarero } from './ui/camarero.js';
+import { renderMobileCamarero } from './ui/mobile_camarero.js';
 import { renderDesktop } from './ui/desktop.js';
 import { renderCocinero } from './ui/cocinero.js';
 import { renderBarra } from './ui/barra.js';
@@ -126,7 +127,11 @@ class App {
             
             if (view === 'camarero') {
                 this.title.innerHTML = `<i class='bx bx-restaurant'></i> Sala${userStr} <span class="header-service-time" id="shift-time"></span>`;
-                renderCamarero(this.container, this);
+                if (window.innerWidth > 800) {
+                    renderDesktopCamarero(this.container, this);
+                } else {
+                    renderMobileCamarero(this.container, this);
+                }
             } else if (view === 'cocinero') {
                 this.title.innerHTML = `<i class='bx bx-bowl-hot'></i> Cocina${userStr} <span class="header-service-time" id="shift-time"></span>`;
                 renderCocinero(this.container, this);

@@ -19,11 +19,14 @@ export function renderManageMenu(container, app) {
             <div style="padding: 1rem; max-width: 1200px; margin: 0 auto; display:flex; flex-direction:column; gap:1rem; height:calc(100vh - 60px); overflow:hidden;">
                 <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
                     <div style="display:flex; align-items:center; gap: 1rem;">
-                        <button class="btn btn-secondary" onclick="window.history.back()">← Volver</button>
+                        <button class="btn btn-secondary" onclick="window.history.back()"><i class='bx bx-left-arrow-alt'></i> Volver</button>
                         <h2>Gestionar Carta</h2>
                     </div>
                     <div style="display:flex; gap:0.5rem; align-items:center;">
-                        <input type="text" id="menu-search" placeholder="🔍 Buscar producto..." value="${searchQuery}" style="padding:0.5rem; border-radius:4px; border:1px solid var(--color-border);">
+                        <div style="position:relative;">
+                            <i class='bx bx-search' style="position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--color-text-muted);"></i>
+                            <input type="text" id="menu-search" placeholder="Buscar producto..." value="${searchQuery}" style="padding:0.5rem 0.5rem 0.5rem 2rem; border-radius:4px; border:1px solid var(--color-border);">
+                        </div>
                         <select id="menu-cat-filter" style="padding:0.5rem; border-radius:4px; border:1px solid var(--color-border);">
                             <option value="Todas">Todas las categorías</option>
                             <option value="Entrantes" ${currentCategoryFilter === 'Entrantes' ? 'selected' : ''}>Entrantes</option>
@@ -37,8 +40,8 @@ export function renderManageMenu(container, app) {
                         </select>
                     </div>
                     <div style="display:flex; gap:0.5rem;">
-                        <button class="btn btn-secondary" id="btn-view-history">📜 Historial</button>
-                        <button class="btn btn-primary" id="btn-add-product">+ Nuevo Producto</button>
+                        <button class="btn btn-secondary" id="btn-view-history"><i class='bx bx-history'></i> Historial</button>
+                        <button class="btn btn-primary" id="btn-add-product"><i class='bx bx-plus'></i> Nuevo Producto</button>
                     </div>
                 </div>
                 
@@ -66,13 +69,15 @@ export function renderManageMenu(container, app) {
                                         <input type="number" class="inline-price-edit" data-id="${p.id}" value="${p.price.toFixed(2)}" step="0.10" style="width:70px; padding:0.2rem; border:1px solid transparent; border-radius:4px; background:transparent;">
                                     </td>
                                     <td style="padding:0.5rem; font-size:0.8rem; color:var(--color-text-muted);">
-                                        ${p.ingredients ? p.ingredients.length : 0} ings. ${p.ingredients && p.ingredients.some(i => i.isAllergen) ? '⚠️' : ''}
+                                        ${p.ingredients ? p.ingredients.length : 0} ings. ${p.ingredients && p.ingredients.some(i => i.isAllergen) ? '<i class="bx bx-error" style="color:var(--color-danger);"></i>' : ''}
                                     </td>
                                     <td style="padding:0.5rem;">
                                         <span style="color:${p.status === 'Activo' ? 'var(--color-free)' : 'var(--color-danger)'};">${p.status}</span>
                                     </td>
                                     <td style="padding:0.5rem; text-align:right;">
-                                        <button class="btn btn-secondary" style="padding:0.25rem 0.5rem; font-size:0.8rem;" onclick="window.editProduct('${p.id}')">✏️ Editar</button>
+                                    <td style="padding:0.5rem; text-align:right;">
+                                        <button class="btn btn-secondary" style="padding:0.25rem 0.5rem; font-size:0.8rem;" onclick="window.editProduct('${p.id}')"><i class='bx bx-edit-alt'></i> Editar</button>
+                                    </td>
                                     </td>
                                 </tr>
                             `).join('')}
@@ -112,7 +117,7 @@ export function renderManageMenu(container, app) {
                     <div style="border:1px solid var(--color-border); border-radius:4px; padding:1rem; background:var(--color-surface); margin-bottom:0.5rem;">
                         <div style="color:var(--color-text-muted); font-size:0.8rem;">${new Date(h.time).toLocaleString()}</div>
                         <strong>${h.product}</strong> - ${h.action}
-                        ${h.oldVal !== '-' ? `<br><span style="color:var(--color-danger); text-decoration:line-through;">${h.oldVal}€</span> ➔ <span style="color:var(--color-free);">${h.newVal}€</span>` : ''}
+                        ${h.oldVal !== '-' ? `<br><span style="color:var(--color-danger); text-decoration:line-through;">${h.oldVal}€</span> <i class='bx bx-right-arrow-alt'></i> <span style="color:var(--color-free);">${h.newVal}€</span>` : ''}
                     </div>
                 `).join('');
             }
@@ -218,7 +223,7 @@ export function renderManageMenu(container, app) {
                         <h4>Ingredientes</h4>
                         <div style="display:flex; gap:0.5rem; margin-bottom:1rem;">
                             <input type="text" id="new-ing-name" placeholder="Nombre ingrediente..." style="flex:1; padding:0.5rem;">
-                            <button class="btn btn-secondary" id="btn-add-ing">Añadir</button>
+                            <button class="btn btn-secondary" id="btn-add-ing"><i class='bx bx-plus'></i> Añadir</button>
                         </div>
                         <table style="width:100%; border-collapse:collapse; font-size:0.9rem;" id="ings-table">
                             <tr style="border-bottom:1px solid var(--color-border);">
@@ -232,7 +237,7 @@ export function renderManageMenu(container, app) {
                                     <td style="padding:0.5rem;">${ing.name}</td>
                                     <td><input type="checkbox" onchange="window.updateIng(${i}, 'elim', this.checked)" ${ing.isEliminable?'checked':''}></td>
                                     <td><input type="checkbox" onchange="window.updateIng(${i}, 'aler', this.checked)" ${ing.isAllergen?'checked':''}></td>
-                                    <td><button class="btn-icon text-danger" onclick="window.removeIng(${i})">❌</button></td>
+                                    <td><button class="btn-icon text-danger" onclick="window.removeIng(${i})"><i class='bx bx-trash'></i></button></td>
                                 </tr>
                             `).join('')}
                         </table>

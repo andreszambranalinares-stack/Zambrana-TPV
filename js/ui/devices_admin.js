@@ -36,7 +36,7 @@ export function renderDevicesAdmin(container, app) {
         content.innerHTML = `
             <div style="display:flex; gap:1rem; margin-bottom:1rem;">
                 <button class="btn btn-secondary" id="btn-sim-device">+ Simular nuevo dispositivo</button>
-                <button class="btn btn-secondary" id="btn-gen-qr">🔗 Generar QR de enlace</button>
+                <button class="btn btn-secondary" id="btn-gen-qr"><i class='bx bx-link'></i> Generar QR de enlace</button>
             </div>
             <div style="overflow-x:auto;">
                 <table style="width:100%; border-collapse: collapse; min-width:800px;">
@@ -54,7 +54,7 @@ export function renderDevicesAdmin(container, app) {
                         ${list.map(d => {
                             const isMobile = d.device_type === 'mobile';
                             const isTablet = d.device_type === 'tablet';
-                            const icon = isMobile ? '📱' : isTablet ? '📟' : '🖥️';
+                            const icon = isMobile ? '<i class="bx bx-mobile-alt"></i>' : isTablet ? '<i class="bx bx-mobile"></i>' : '<i class="bx bx-desktop"></i>';
                             const isActive = (Date.now() - d.last_seen) < 120000; // 2 mins
                             const timeAgo = formatRelativeTime(d.last_seen);
                             
@@ -64,14 +64,14 @@ export function renderDevicesAdmin(container, app) {
                                     <td style="padding:0.5rem;">${d.assigned_role}</td>
                                     <td style="padding:0.5rem;">${d.assigned_employee || 'Ninguno'}</td>
                                     <td style="padding:0.5rem;">
-                                        <span style="color:${isActive ? 'var(--color-free)' : 'var(--color-danger)'};">
-                                            ${isActive ? '🟢 Activo' : '🔴 Inactivo'}
+                                        <span style="color:${isActive ? 'var(--color-free)' : 'var(--color-danger)'}; display:flex; align-items:center; gap:0.4rem;">
+                                            <i class='bx bxs-circle' style="font-size:0.7rem;"></i> ${isActive ? 'Activo' : 'Inactivo'}
                                         </span>
                                     </td>
                                     <td style="padding:0.5rem;">${timeAgo}</td>
                                     <td style="padding:0.5rem; display:flex; gap:0.5rem;">
-                                        <button class="btn btn-secondary" style="padding:0.25rem 0.5rem;" onclick="window.editDevice('${d.device_id}')">✏️ Editar</button>
-                                        <button class="btn btn-secondary" style="padding:0.25rem 0.5rem; color:var(--color-danger); border-color:var(--color-danger);" onclick="window.deleteDevice('${d.device_id}')">🗑️</button>
+                                        <button class="btn btn-secondary" style="padding:0.25rem 0.5rem;" onclick="window.editDevice('${d.device_id}')"><i class='bx bx-edit-alt'></i> Editar</button>
+                                        <button class="btn btn-secondary" style="padding:0.25rem 0.5rem; color:var(--color-danger); border-color:var(--color-danger);" onclick="window.deleteDevice('${d.device_id}')"><i class='bx bx-trash'></i></button>
                                     </td>
                                 </tr>
                             `;
@@ -256,7 +256,7 @@ export function renderDevicesAdmin(container, app) {
                             <strong>${i.qty}x ${i.name}</strong>
                             ${i.modifiers && i.modifiers.length ? `<br><small style="color:var(--color-primary);">+ ${i.modifiers.join(', ')}</small>` : ''}
                             ${i.removedIngredients && i.removedIngredients.length ? `<br><small style="color:var(--color-danger);">- ${i.removedIngredients.join(', ')}</small>` : ''}
-                            ${i.note ? `<br><small>📝 ${i.note}</small>` : ''}
+                            ${i.note ? `<br><small><i class='bx bx-note'></i> ${i.note}</small>` : ''}
                         </div>
                     `).join('')}
                 </div>

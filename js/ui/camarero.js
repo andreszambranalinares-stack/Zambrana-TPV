@@ -2,6 +2,7 @@ import { globalState } from '../state.js';
 import { formatTimeElapsed, formatTimeHM, showModal, closeModal } from './common.js';
 import { getCategoryDestination } from '../data.js';
 import { auth } from '../auth.js';
+import { tickets } from '../tickets.js';
 
 export function renderCamarero(container, app) {
     let currentTable = null;
@@ -9,22 +10,37 @@ export function renderCamarero(container, app) {
     let currentMenuTab = app.currentUser?.favCategory || 'Entrante';
     let searchQuery = '';
 
+    let tableFilter = 'Todas';
+
     const renderTablesGrid = () => {
         let bannerHtml = '';
         if (globalState.isKitchenPaused) {
             bannerHtml = `<div class="banner">⚠️ Cocina saturada — revisar tiempos</div>`;
         }
 
-        const isCustomLayout = globalState.tables.some(t => t.x !== undefined);
-        const gridClass = isCustomLayout ? 'tables-layout' : 'tables-grid';
+        const zones = ['Todas', 'Terraza', 'Salón', 'Barra', 'Privado'];
 
         const html = `
             <div class="waiter-view">
                 ${bannerHtml}
-                <div class="${gridClass}" id="tables-container"></div>
+                <div class="view-header-bar" style="padding:1rem; display:flex; justify-content:space-between; align-items:center;">
+                    <div class="tabs-container">
+                        ${zones.map(z=>`<button class="tab-pill ${tableFilter===z?'active':''}" data-zone="${z}">${z}</button>`).join('')}
+                    </div>
+                    <div style="font-weight:700; color:var(--color-text-muted);">PLANO DE MESAS</div>
+                </div>
+                <div class="tables-spatial-grid" id="tables-container" style="display:grid; grid-template-columns:repeat(8, 1fr); grid-template-rows:repeat(6, 1fr); gap:12px; padding:1.5rem; background:var(--color-bg); flex:1; min-height:500px;"></div>
             </div>
         `;
         container.innerHTML = html;
+        
+        document.querySelectorAll('[data-zone]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                tableFilter = btn.dataset.zone;
+                renderTablesGrid();
+            });
+        });
+
         updateTables();
     };
 
@@ -32,51 +48,40 @@ export function renderCamarero(container, app) {
         const tContainer = document.getElementById('tables-container');
         if (!tContainer) return; 
         
-        const isCustomLayout = tContainer.classList.contains('tables-layout');
         tContainer.innerHTML = '';
         
-        globalState.tables.forEach((table, index) => {
-            const div = document.createElement('div');
-            div.className = isCustomLayout ? `table-card-absolute table-status-${table.status}` : `table-card table-status-${table.status}`;
+        // Fill all 48 cells of the 8x6 grid
+        for (let i = 0; i < 48; i++) {
+            const table = globalState.tables.find(t => t.gridCell === i);
+            const cell = document.createElement('div');
+            cell.style.border = '1px dashed var(--color-border)';
+            cell.style.borderRadius = '12px';
+            cell.style.opacity = '0.2';
             
-            if (isCustomLayout) {
-                div.style.left = (table.x || (index % 5) * 15 + 5) + '%';
-                div.style.top = (table.y || Math.floor(index / 5) * 20 + 5) + '%';
-            }
-            
-            let timeStr = '';
-            let isFlashing = false;
-            let showNeglect = false;
-            
-            if (table.openedAt) {
-                timeStr = `<div class="time">${formatTimeHM(table.openedAt)}</div>`;
-                const activeOrders = globalState.orders.filter(o => o.tableId === table.id && o.status === 'en_cocina');
-                if (activeOrders.length > 0) {
-                    const oldest = Math.min(...activeOrders.map(o => o.timestamp));
-                    const diffMins = (Date.now() - oldest) / 60000;
-                    if (diffMins > globalState.config.alertDanger) {
-                        isFlashing = true;
-                    }
-                } else if (table.status === 'ocupada') {
-                    const diffMins = (Date.now() - table.openedAt) / 60000;
-                    if (diffMins > 10) showNeglect = true;
+            if (table) {
+                const isFiltered = tableFilter === 'Todas' || table.zone === tableFilter;
+                cell.className = `table-card table-status-${table.status}`;
+                cell.style.opacity = isFiltered ? '1' : '0.15';
+                cell.style.border = isFiltered ? '2px solid var(--color-primary)' : '1px solid var(--color-border)';
+                cell.style.transform = isFiltered ? 'scale(1)' : 'scale(0.9)';
+                cell.style.cursor = 'pointer';
+                cell.style.position = 'relative';
+                
+                let timeStr = '';
+                if (table.openedAt) {
+                    timeStr = `<div class="time" style="position:absolute; bottom:5px; right:5px; font-size:0.65rem; opacity:0.8;">${formatTimeHM(table.openedAt)}</div>`;
                 }
-            }
-            if (isFlashing) div.style.animation = 'pulse 1s infinite';
 
-            const guestsStr = table.guests > 0 ? `<div class="guests">👥 ${table.guests}</div>` : '';
-            const neglectStr = showNeglect ? `<div class="neglect-icon">⏰</div>` : '';
-            
-            div.innerHTML = `
-                ${guestsStr}
-                <div style="font-size:1.5rem; font-weight:bold;">${table.id}</div>
-                ${timeStr}
-                ${neglectStr}
-            `;
-            
-            div.addEventListener('click', () => openTableDetails(table));
-            tContainer.appendChild(div);
-        });
+                cell.innerHTML = `
+                    <div style="font-weight:800; font-size:1.2rem;">${String(table.id).padStart(2,'0')}</div>
+                    ${table.guests ? `<div style="font-size:0.7rem;"><i class='bx bx-user'></i>${table.guests}</div>` : ''}
+                    ${timeStr}
+                `;
+                
+                cell.addEventListener('click', () => openTableDetails(table));
+            }
+            tContainer.appendChild(cell);
+        }
     };
 
     const openTableDetails = (table) => {
@@ -132,19 +137,15 @@ export function renderCamarero(container, app) {
                         <input type="text" id="menu-search-camarero" placeholder="🔍 Buscar..." style="padding:0.5rem; border-radius:4px; border:1px solid var(--color-border); flex:1; margin-left:1rem; max-width:200px;">
                     </div>
                     
-                    <div style="background: var(--color-surface); padding: 0.5rem; overflow-x: auto; white-space: nowrap; border-bottom: 2px solid var(--color-border); display: flex; gap: 0.5rem; scrollbar-width: none;">
-                <button class="tab-btn ${currentMenuTab==='⭐'?'active':''}" data-tab="⭐" style="border-radius: 20px; padding: 0.5rem 1rem; border: none; font-weight: 600; cursor: pointer; transition: all 0.2s; background: ${currentMenuTab==='⭐' ? 'var(--color-primary)' : 'var(--color-bg)'}; color: ${currentMenuTab==='⭐' ? '#fff' : 'var(--color-text)'}; box-shadow: ${currentMenuTab==='⭐' ? '0 4px 6px rgba(139, 0, 0, 0.2)' : 'none'};">⭐ Favs</button>
-                <button class="tab-btn ${currentMenuTab==='Entrantes'?'active':''}" data-tab="Entrantes" style="border-radius: 20px; padding: 0.5rem 1rem; border: none; font-weight: 600; cursor: pointer; transition: all 0.2s; background: ${currentMenuTab==='Entrantes' ? 'var(--color-primary)' : 'var(--color-bg)'}; color: ${currentMenuTab==='Entrantes' ? '#fff' : 'var(--color-text)'}; box-shadow: ${currentMenuTab==='Entrantes' ? '0 4px 6px rgba(139, 0, 0, 0.2)' : 'none'};">Entrantes</button>
-                <button class="tab-btn ${currentMenuTab==='Carnes'?'active':''}" data-tab="Carnes" style="border-radius: 20px; padding: 0.5rem 1rem; border: none; font-weight: 600; cursor: pointer; transition: all 0.2s; background: ${currentMenuTab==='Carnes' ? 'var(--color-primary)' : 'var(--color-bg)'}; color: ${currentMenuTab==='Carnes' ? '#fff' : 'var(--color-text)'}; box-shadow: ${currentMenuTab==='Carnes' ? '0 4px 6px rgba(139, 0, 0, 0.2)' : 'none'};">Carnes</button>
-                <button class="tab-btn ${currentMenuTab==='Pescados'?'active':''}" data-tab="Pescados" style="border-radius: 20px; padding: 0.5rem 1rem; border: none; font-weight: 600; cursor: pointer; transition: all 0.2s; background: ${currentMenuTab==='Pescados' ? 'var(--color-primary)' : 'var(--color-bg)'}; color: ${currentMenuTab==='Pescados' ? '#fff' : 'var(--color-text)'}; box-shadow: ${currentMenuTab==='Pescados' ? '0 4px 6px rgba(139, 0, 0, 0.2)' : 'none'};">Pescados</button>
-                <button class="tab-btn ${currentMenuTab==='Pastas'?'active':''}" data-tab="Pastas" style="border-radius: 20px; padding: 0.5rem 1rem; border: none; font-weight: 600; cursor: pointer; transition: all 0.2s; background: ${currentMenuTab==='Pastas' ? 'var(--color-primary)' : 'var(--color-bg)'}; color: ${currentMenuTab==='Pastas' ? '#fff' : 'var(--color-text)'}; box-shadow: ${currentMenuTab==='Pastas' ? '0 4px 6px rgba(139, 0, 0, 0.2)' : 'none'};">Pastas</button>
-                <button class="tab-btn ${currentMenuTab==='Postres'?'active':''}" data-tab="Postres" style="border-radius: 20px; padding: 0.5rem 1rem; border: none; font-weight: 600; cursor: pointer; transition: all 0.2s; background: ${currentMenuTab==='Postres' ? 'var(--color-primary)' : 'var(--color-bg)'}; color: ${currentMenuTab==='Postres' ? '#fff' : 'var(--color-text)'}; box-shadow: ${currentMenuTab==='Postres' ? '0 4px 6px rgba(139, 0, 0, 0.2)' : 'none'};">Postres</button>
-                <button class="tab-btn ${currentMenuTab==='Bebidas'?'active':''}" data-tab="Bebidas" style="border-radius: 20px; padding: 0.5rem 1rem; border: none; font-weight: 600; cursor: pointer; transition: all 0.2s; background: ${currentMenuTab==='Bebidas' ? 'var(--color-primary)' : 'var(--color-bg)'}; color: ${currentMenuTab==='Bebidas' ? '#fff' : 'var(--color-text)'}; box-shadow: ${currentMenuTab==='Bebidas' ? '0 4px 6px rgba(139, 0, 0, 0.2)' : 'none'};">Bebidas</button>
+                    <div class="desktop-tab-row">
+                <button class="tab-btn desktop-tab-pill ${currentMenuTab==='favs'?'active':''}" data-tab="favs"><i class='bx bx-star'></i> Favoritos</button>
+                <button class="tab-btn desktop-tab-pill ${currentMenuTab==='Entrantes'?'active':''}" data-tab="Entrantes"><i class='bx bx-bowl-rice'></i> Entrantes</button>
+                <button class="tab-btn desktop-tab-pill ${currentMenuTab==='Carnes'?'active':''}" data-tab="Carnes"><i class='bx bx-dish'></i> Carnes</button>
+                <button class="tab-btn desktop-tab-pill ${currentMenuTab==='Pescados'?'active':''}" data-tab="Pescados"><i class='bx bx-water'></i> Pescado</button>
+                <button class="tab-btn desktop-tab-pill ${currentMenuTab==='Pastas'?'active':''}" data-tab="Pastas"><i class='bx bx-restaurant'></i> Pastas</button>
+                <button class="tab-btn desktop-tab-pill ${currentMenuTab==='Postres'?'active':''}" data-tab="Postres"><i class='bx bx-cake'></i> Postre</button>
+                <button class="tab-btn desktop-tab-pill ${currentMenuTab==='Bebidas'?'active':''}" data-tab="Bebidas"><i class='bx bx-drink'></i> Bebidas</button>
             </div>
-            <style>
-                .tab-btn:hover { background: var(--color-border) !important; color: var(--color-text) !important; box-shadow: none !important; }
-                .tab-btn.active:hover { background: var(--color-primary-dark) !important; color: white !important; box-shadow: 0 4px 6px rgba(139, 0, 0, 0.3) !important; }
-            </style>
 
                     <div id="menu-container" style="margin-top:1rem; overflow-y:auto; flex:1;"></div>
                 </div>
@@ -566,52 +567,60 @@ export function renderCamarero(container, app) {
                     <div style="text-align:center;">
                         <h2>Total a pagar: ${grandTotal.toFixed(2)} €</h2>
                         <div style="margin-top:2rem; display:flex; gap:1rem; justify-content:center;">
-                            <button class="btn btn-primary" id="btn-pay-cash">Efectivo</button>
-                            <button class="btn btn-primary" id="btn-pay-card">Tarjeta</button>
-                            <button class="btn btn-secondary" id="btn-pay-split">Dividir Cuenta</button>
+                            <button class="pay-method" data-method="efectivo" style="display:flex;align-items:center;gap:.75rem;padding:1rem;border-radius:12px;border:2px solid var(--color-border);background:var(--color-bg);color:var(--color-text);cursor:pointer;font-size:1rem;font-weight:600;transition:all .15s;">
+                                <span style="font-size:1.4rem;"><i class='bx bx-money'></i></span> Efectivo
+                            </button>
+                            <button class="pay-method" data-method="tarjeta" style="display:flex;align-items:center;gap:.75rem;padding:1rem;border-radius:12px;border:2px solid var(--color-border);background:var(--color-bg);color:var(--color-text);cursor:pointer;font-size:1rem;font-weight:600;transition:all .15s;">
+                                <span style="font-size:1.4rem;"><i class='bx bx-credit-card'></i></span> Tarjeta
+                            </button>
+                            <button class="pay-method" data-method="dividida" style="display:flex;align-items:center;gap:.75rem;padding:1rem;border-radius:12px;border:2px solid var(--color-border);background:var(--color-bg);color:var(--color-text);cursor:pointer;font-size:1rem;font-weight:600;transition:all .15s;">
+                                <span style="font-size:1.4rem;"><i class='bx bx-group'></i></span> Pago Dividido
+                            </button>
                         </div>
                     </div>
                 `;
                 const modalId = showModal(`Cobrar Mesa ${currentTable.id}`, html);
                 
                 const processPayment = (method) => {
-                    import('../tickets.js').then(module => {
-                        module.tickets.printCobro(currentTable, activeOrders, grandTotal, method);
-                        globalState.closeTable(currentTable.id);
-                        closeModal(modalId);
-                        renderTablesGrid();
-                    });
+                    tickets.printCobro(currentTable, activeOrders, grandTotal, method);
+                    globalState.closeTable(currentTable.id);
+                    closeModal(modalId);
+                    renderTablesGrid();
                 };
                 
-                document.getElementById('btn-pay-cash')?.addEventListener('click', () => processPayment('efectivo'));
-                document.getElementById('btn-pay-card')?.addEventListener('click', () => processPayment('tarjeta'));
-                document.getElementById('btn-pay-split')?.addEventListener('click', () => {
-                    const splitHtml = `
-                        <div style="text-align:center;">
-                            <label>¿Entre cuántas personas?</label>
-                            <input type="number" id="split-count" min="2" max="20" value="2" style="width:60px; margin-left:1rem;">
-                            <div style="margin-top:1rem;" id="split-calc"></div>
-                            <button class="btn btn-primary" id="btn-confirm-split" style="margin-top:1rem;">Cobrar Partes</button>
-                        </div>
-                    `;
-                    const splitModalId = showModal('Dividir Cuenta', splitHtml);
-                    closeModal(modalId);
-                    
-                    const updateSplit = () => {
-                        const count = parseInt(document.getElementById('split-count').value);
-                        const perPerson = grandTotal / count;
-                        document.getElementById('split-calc').innerHTML = `<strong>${perPerson.toFixed(2)} €</strong> por persona`;
-                    };
-                    document.getElementById('split-count').addEventListener('input', updateSplit);
-                    updateSplit();
-                    
-                    document.getElementById('btn-confirm-split').addEventListener('click', () => {
-                        import('../tickets.js').then(module => {
-                            module.tickets.printCobro(currentTable, activeOrders, grandTotal, 'dividida');
-                            globalState.closeTable(currentTable.id);
-                            closeModal(splitModalId);
-                            renderTablesGrid();
-                        });
+                document.querySelectorAll('.pay-method').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const method = btn.dataset.method;
+                        if (method === 'dividida') {
+                            const splitHtml = `
+                                <div style="text-align:center;">
+                                    <label>¿Entre cuántas personas?</label>
+                                    <input type="number" id="split-count" min="2" max="20" value="2" style="width:60px; margin-left:1rem; padding:0.5rem; border-radius:4px; border:1px solid var(--color-border);">
+                                    <div style="margin-top:1.5rem; font-size:1.2rem;" id="split-calc"></div>
+                                    <button class="btn btn-primary" id="btn-confirm-split" style="margin-top:1.5rem; width:100%;">Confirmar Pago</button>
+                                </div>
+                            `;
+                            const splitModalId = showModal('Dividir Cuenta', splitHtml);
+                            closeModal(modalId);
+                            
+                            const updateSplit = () => {
+                                const count = parseInt(document.getElementById('split-count').value) || 1;
+                                const perPerson = grandTotal / count;
+                                document.getElementById('split-calc').innerHTML = `<strong>${perPerson.toFixed(2)} €</strong> por persona`;
+                            };
+                            
+                            document.getElementById('split-count').addEventListener('input', updateSplit);
+                            updateSplit();
+                            
+                            document.getElementById('btn-confirm-split').addEventListener('click', () => {
+                                tickets.printCobro(currentTable, activeOrders, grandTotal, 'dividida');
+                                globalState.closeTable(currentTable.id);
+                                closeModal(splitModalId);
+                                renderTablesGrid();
+                            });
+                        } else {
+                            processPayment(method);
+                        }
                     });
                 });
             });

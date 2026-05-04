@@ -139,10 +139,10 @@ export function renderCocinero(container, app) {
     };
 
     const getCourseIcon = (course) => {
-        if (course === 'Entrante') return '🥗';
-        if (course === 'Primer plato') return '🍲';
-        if (course === 'Segundo plato') return '🥩';
-        return '🍽️';
+        if (course === 'Entrante') return '<i class="bx bx-bowl-rice"></i>';
+        if (course === 'Primer plato') return '<i class="bx bx-dish"></i>';
+        if (course === 'Segundo plato') return '<i class="bx bx-restaurant"></i>';
+        return '<i class="bx bx-food-menu"></i>';
     };
 
     const createTicketHTML = (order, isPrep) => {
@@ -172,7 +172,7 @@ export function renderCocinero(container, app) {
 
         const progressIndicators = Object.keys(courseProgress).map(c => {
             const p = courseProgress[c];
-            const statusIcon = p.ready === p.total ? '✅' : '⏳';
+            const statusIcon = p.ready === p.total ? '<i class="bx bx-check-circle"></i>' : '<i class="bx bx-time"></i>';
             return `${c.split(' ')[0]} ${statusIcon}`;
         }).join(' · ');
 
@@ -181,8 +181,8 @@ export function renderCocinero(container, app) {
                 <li class="ticket-item" style="border-bottom: 1px dashed var(--color-border); padding-bottom: 0.5rem;">
                     ${isPrep && !item.isReady ? `<input type="checkbox" class="ticket-item-check" id="check-${order.id}-${item.idx}" style="transform: scale(1.5); margin-right: 1rem; cursor:pointer;">` : ''}
                     <div style="flex:1; ${item.isReady && isPrep ? 'text-decoration:line-through; opacity:0.5;' : ''}">
-                        <span class="ticket-item-qty">${item.qty}x</span> <strong>${item.name}</strong> ${item.isReady ? '✅' : ''}
-                        ${item.note ? `<div class="ticket-notes" style="color:var(--color-danger);">${item.note}</div>` : ''}
+                        <span class="ticket-item-qty">${item.qty}x</span> <strong>${item.name}</strong> ${item.isReady ? '<i class="bx bx-check-circle"></i>' : ''}
+                        ${item.note ? `<div class="ticket-notes" style="color:var(--color-danger);"><i class="bx bx-note"></i> ${item.note}</div>` : ''}
                     </div>
                 </li>
             `).join('');
@@ -197,7 +197,7 @@ export function renderCocinero(container, app) {
             `;
         }).join('');
 
-        const tagAdd = order.isAdditional ? `<span class="ticket-tag-additional">⚡ ADICIONAL</span>` : '';
+        const tagAdd = order.isAdditional ? `<span class="ticket-tag-additional"><i class="bx bx-bolt"></i> ADICIONAL</span>` : '';
         const timeAttr = `data-timestamp="${order.timestamp}"`;
         const readyAttr = order.readyAt ? `data-ready-timestamp="${order.readyAt}"` : '';
 
@@ -217,10 +217,10 @@ export function renderCocinero(container, app) {
                 ${isPrep ? `
                     <div style="display:flex; gap:0.5rem; margin-top:1rem;">
                         <button class="btn btn-secondary" style="flex:1; font-size:0.9rem;" id="btn-send-sel-${order.id}">
-                            Enviar Seleccionados ✅
+                            <i class='bx bx-send'></i> Enviar Selección
                         </button>
                         <button class="btn btn-primary" style="flex:1; font-size:0.9rem;" id="btn-ready-all-${order.id}">
-                            TODO LISTO
+                            <i class='bx bx-check-double'></i> TODO LISTO
                         </button>
                     </div>
                 ` : `

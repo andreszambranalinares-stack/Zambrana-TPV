@@ -227,14 +227,44 @@ header h1 { font-size: 1.1rem; font-weight: 700; display:flex; align-items:cente
     
     /* Order Layout */
     .order-layout { flex-direction: row; margin: -1.5rem; }
-    .menu-section { padding: 1.5rem; }
+    .menu-section { padding: 1.5rem; flex: 1; min-width: 0; }
     .order-section { 
         position: relative; height: auto; transform: none; 
-        max-width: 400px; border-radius: 0; box-shadow: -10px 0 30px rgba(0,0,0,0.03); 
-        border-left: 1px solid var(--color-border);
+        width: 500px; min-width: 500px; max-width: 500px; border-radius: 0; box-shadow: -10px 0 30px rgba(0,0,0,0.08); 
+        border-left: 1px solid var(--color-border); flex-shrink: 0;
     }
     .mobile-cart-toggle { display: none; }
     .action-buttons { grid-template-columns: 1fr 1fr; }
+
+    /* Desktop category tabs — más prominentes */
+    .desktop-tab-row {
+        display: flex;
+        gap: 0.4rem;
+        overflow-x: auto;
+        padding: 0.75rem 1rem;
+        background: var(--color-surface);
+        border-bottom: 2px solid var(--color-border);
+        scrollbar-width: none;
+        flex-shrink: 0;
+    }
+    .desktop-tab-row::-webkit-scrollbar { display: none; }
+    .desktop-tab-pill {
+        flex-shrink: 0;
+        padding: 0.5rem 1.1rem;
+        border-radius: 22px;
+        border: 2px solid var(--color-border);
+        background: var(--color-bg);
+        color: var(--color-text-muted);
+        font-size: 0.82rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.2s;
+        white-space: nowrap;
+        letter-spacing: 0.01em;
+    }
+    .desktop-tab-pill:hover { border-color: var(--color-primary-light); color: var(--color-text); background: var(--color-surface-hover); }
+    .desktop-tab-pill.active { background: var(--color-primary); border-color: var(--color-primary); color: #fff; box-shadow: 0 4px 12px rgba(139, 0, 0, 0.35); }
+    .items-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
     
     /* Kanban */
     .cook-kanban { flex-direction: row; height: calc(100vh - 140px); justify-content: center; align-items: stretch; gap: 2rem; }

@@ -57,7 +57,7 @@ export function renderHome(container, app) {
         );
 
         if (auth.isAdmin()) {
-            app.currentUser = { id: 'admin', alias: 'Administrador', role: roleFilter, favCategory: '⭐', isAdmin: true };
+            app.currentUser = { id: 'admin', alias: 'Administrador', role: roleFilter, favCategory: 'favs', isAdmin: true };
             deviceManager.linkEmployee('Administrador');
             app.navigate(viewDest);
             return;

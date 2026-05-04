@@ -493,12 +493,12 @@ export function renderAdmin(container, app) {
                 <div id="grid-editor-header">
                     <h2><i class='bx bx-grid-alt'></i> Editor de Plano</h2>
                     <div id="grid-editor-legend">
-                        <span>📐 Cuadrícula: ${COLS} × ${ROWS} = ${MAX_TABLES} celdas máx.</span>
-                        <span>🟥 ${globalState.tables.length} mesa${globalState.tables.length !== 1 ? 's' : ''} configurada${globalState.tables.length !== 1 ? 's' : ''}</span>
+                        <span><i class='bx bx-shape-square'></i> Cuadrícula: ${COLS} × ${ROWS} = ${MAX_TABLES} celdas máx.</span>
+                        <span><i class='bx bx-rectangle'></i> ${globalState.tables.length} mesa${globalState.tables.length !== 1 ? 's' : ''} configurada${globalState.tables.length !== 1 ? 's' : ''}</span>
                     </div>
                     <div style="display:flex;gap:.5rem;">
-                        <button class="btn btn-secondary" id="btn-editor-cancel">↩ Volver</button>
-                        <button class="btn btn-primary" id="btn-editor-save">💾 Guardar Plano</button>
+                        <button class="btn btn-secondary" id="btn-editor-cancel"><i class='bx bx-undo'></i> Volver</button>
+                        <button class="btn btn-primary" id="btn-editor-save"><i class='bx bx-save'></i> Guardar Plano</button>
                     </div>
                 </div>
                 <div id="editor-grid">

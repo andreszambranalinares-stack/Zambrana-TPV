@@ -40,7 +40,7 @@ export function renderAllergensView() {
             html += `
                 <div>
                     <h4 style="color:var(--color-danger); border-bottom:1px solid var(--color-border); padding-bottom:0.25rem;">
-                        ⚠️ ${type}
+                        <i class='bx bx-error'></i> ${type}
                     </h4>
                     <ul style="list-style-type:disc; padding-left:1.5rem; margin-top:0.5rem;">
                         ${Array.from(map[type]).map(prod => `<li>${prod}</li>`).join('')}
