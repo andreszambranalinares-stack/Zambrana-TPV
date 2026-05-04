@@ -24,16 +24,16 @@ export function renderHome(container, app) {
             <img src="logo.png" alt="Zambrana TPV" style="height: 80px; max-width: 90%; object-fit: contain; margin-bottom: 1rem;">
             ${shiftInfo}
             <div class="role-cards ${disabledClass}">
-                <button class="role-card" id="role-camarero">
+                <button class="role-card" id="role-camarero" data-tour="role-camarero">
                     <span class="icon"><i class="bx bx-restaurant"></i></span>
                     <span>Camarero</span>
                 </button>
-                <button class="role-card" id="role-cocinero">
+                <button class="role-card" id="role-cocinero" data-tour="role-cocinero">
                     ${kitchenPending > 0 ? `<div class="badge">${kitchenPending}</div>` : ''}
                     <span class="icon"><i class="bx bx-bowl-hot"></i></span>
                     <span>Cocinero</span>
                 </button>
-                <button class="role-card" id="role-barra">
+                <button class="role-card" id="role-barra" data-tour="role-barra">
                     ${barPending > 0 ? `<div class="badge">${barPending}</div>` : ''}
                     <span class="icon"><i class="bx bx-drink"></i></span>
                     <span>Barra</span>

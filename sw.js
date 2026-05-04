@@ -1,4 +1,4 @@
-const CACHE_NAME = 'zambrana-v1.0';
+const CACHE_NAME = 'zambrana-v2.5';
 const ASSETS = [
     './',
     './index.html',

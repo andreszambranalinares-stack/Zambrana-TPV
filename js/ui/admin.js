@@ -10,38 +10,32 @@ export function renderAdmin(container, app) {
             <div style="padding: 1rem; max-width: 1200px; margin: 0 auto; padding-bottom: 5rem;">
                 <h2 style="margin-bottom: 1rem;">Panel de Administración</h2>
                 
-                <div class="dashboard-grid" style="margin-bottom: 2rem;">
-                    <div class="widget" id="sec-estado-servicio" style="grid-column: 1 / -1;">
-                        <h3>Estado del Servicio en Vivo</h3>
-                        <div style="display:flex; flex-wrap:wrap; gap:1rem; margin-top:1rem;">
-                            <div style="flex:1; min-width:150px; background:var(--color-bg); padding:1rem; border-radius:8px; text-align:center;">
-                                <div style="font-size:2rem; font-weight:bold; color:var(--color-primary);">${deviceManager.getQueue('queue_cocina').length}</div>
-                                <div>Comandas Cocina</div>
-                            </div>
-                            <div style="flex:1; min-width:150px; background:var(--color-bg); padding:1rem; border-radius:8px; text-align:center;">
-                                <div style="font-size:2rem; font-weight:bold; color:var(--color-primary);">${deviceManager.getQueue('queue_barra').length}</div>
-                                <div>Comandas Barra</div>
-                            </div>
-                            <div style="flex:1; min-width:150px; background:var(--color-bg); padding:1rem; border-radius:8px; text-align:center;">
-                                <div style="font-size:2rem; font-weight:bold; color:var(--color-free);">${globalState.tables.filter(t => t.status !== 'libre').length}</div>
-                                <div>Mesas Abiertas</div>
-                            </div>
-                            <div style="flex:1; min-width:150px; background:var(--color-bg); padding:1rem; border-radius:8px; text-align:center;">
-                                <div style="font-size:2rem; font-weight:bold;">${Object.values(deviceManager.getDevices()).filter(d => (Date.now() - d.last_seen) < 120000).length}</div>
-                                <div>Dispositivos Activos</div>
-                            </div>
-                            <div style="flex:1; min-width:150px; background:var(--color-bg); padding:1rem; border-radius:8px; text-align:center;">
-                                <div style="font-size:1.5rem; font-weight:bold;">${calculateAverageWaitTime()} min</div>
-                                <div>Espera Media</div>
-                            </div>
+                <div class="widget" id="sec-estado-servicio" style="margin-bottom:1rem;">
+                    <h3>Estado del Servicio en Vivo</h3>
+                    <div class="admin-stats-row" style="margin-top:.75rem;">
+                        <div class="admin-stat-card">
+                            <div class="stat-val">${deviceManager.getQueue('queue_cocina').length}</div>
+                            <div class="stat-lbl">Cocina</div>
                         </div>
-                        <div style="margin-top:1rem; padding-top:1rem; border-top:1px solid var(--color-border); display:flex; flex-wrap:wrap; gap:1rem;">
-                            <div style="flex:1; min-width:200px;">
-                                <strong>Estadísticas de Barra:</strong><br>
-                                Bebidas servidas: ${calculateBarraStats().servidas}<br>
-                                Bebidas pendientes: ${calculateBarraStats().pendientes}<br>
-                                Top ventas: <span style="color:var(--color-primary); font-weight:bold;">${calculateBarraStats().topVentas}</span>
-                            </div>
+                        <div class="admin-stat-card">
+                            <div class="stat-val">${deviceManager.getQueue('queue_barra').length}</div>
+                            <div class="stat-lbl">Barra</div>
+                        </div>
+                        <div class="admin-stat-card">
+                            <div class="stat-val" style="color:var(--color-free);">${globalState.tables.filter(t => t.status !== 'libre').length}</div>
+                            <div class="stat-lbl">Mesas Abiertas</div>
+                        </div>
+                        <div class="admin-stat-card">
+                            <div class="stat-val">${Object.values(deviceManager.getDevices()).filter(d => (Date.now()-d.last_seen)<120000).length}</div>
+                            <div class="stat-lbl">Dispositivos</div>
+                        </div>
+                        <div class="admin-stat-card">
+                            <div class="stat-val" style="font-size:1.4rem;">${calculateAverageWaitTime()} min</div>
+                            <div class="stat-lbl">Espera Media</div>
+                        </div>
+                        <div class="admin-stat-card">
+                            <div class="stat-val" style="font-size:1.1rem;">${calculateBarraStats().topVentas}</div>
+                            <div class="stat-lbl">Top Ventas</div>
                         </div>
                     </div>
                 </div>
@@ -110,8 +104,8 @@ export function renderAdmin(container, app) {
                             <h3>Empleados</h3>
                             <button class="btn btn-primary" id="btn-add-emp">+ Nuevo Empleado</button>
                         </div>
-                        <div style="overflow-x:auto;">
-                            <table style="width:100%; border-collapse: collapse; min-width: 600px;">
+                        <div class="emp-table-wrap">
+                            <table style="border-collapse: collapse;">
                                 <thead>
                                     <tr style="text-align:left; border-bottom: 2px solid var(--color-border);">
                                         <th style="padding:0.5rem;">Alias</th>
@@ -391,171 +385,262 @@ export function renderAdmin(container, app) {
     };
 
     const renderTableEditor = () => {
-        container.innerHTML = `
-            <div style="padding: 1rem; max-width: 1200px; margin: 0 auto; height:100vh; display:flex; flex-direction:column;">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 1rem; flex-wrap:wrap; gap:1rem;">
-                    <h2>Editor de Plano de Mesas</h2>
-                    <div style="display:flex; gap:0.5rem; align-items:center;">
-                        <button class="btn btn-secondary" id="btn-multi-select" style="background:var(--color-surface); border:1px solid var(--color-border); color:var(--color-text);"><i class='bx bx-checkbox'></i> Multiselección: OFF</button>
-                        <button class="btn btn-secondary" id="btn-editor-cancel">Volver</button>
-                        <button class="btn btn-primary" id="btn-editor-save">Guardar Plano</button>
-                    </div>
-                </div>
-                <div class="editor-container" id="editor-area" style="width: 100%; aspect-ratio: 16/9; max-width: 1200px; background: var(--color-surface); border: 2px dashed var(--color-border); border-radius: var(--radius-md); margin: 0 auto; position:relative; overflow:hidden;"></div>
-            </div>
-        `;
+        const COLS = 8;
+        const ROWS = 6;
+        const MAX_TABLES = COLS * ROWS; // 48
 
-        const area = document.getElementById('editor-area');
-        let multiSelectMode = false;
-        let selectedTables = new Set();
-        let isDragging = false;
-        let dragStartClient = { x: 0, y: 0 };
-        let activeDragEl = null;
-        let initialPositions = new Map(); // Store {x, y} for each selected table at the start of drag
+        // Build grid state: cellIndex → tableId (or null)
+        // Assign default positions for tables that don't have one yet
+        const gridMap = new Map(); // cellIndex → tableId
 
-        const btnMulti = document.getElementById('btn-multi-select');
-        btnMulti.addEventListener('click', () => {
-            multiSelectMode = !multiSelectMode;
-            btnMulti.innerHTML = multiSelectMode ? '<i class="bx bx-checkbox-checked"></i> Multiselección: ON' : '<i class="bx bx-checkbox"></i> Multiselección: OFF';
-            btnMulti.style.borderColor = multiSelectMode ? 'var(--color-primary)' : 'var(--color-border)';
-            if (!multiSelectMode) {
-                selectedTables.clear();
-                document.querySelectorAll('.table-card-absolute').forEach(el => el.style.boxShadow = '');
+        globalState.tables.forEach((table, i) => {
+            const defaultCell = Math.min(i, MAX_TABLES - 1);
+            const cell = (table.gridCell !== undefined && table.gridCell < MAX_TABLES) ? table.gridCell : defaultCell;
+            // Avoid duplicate assignments
+            if (!gridMap.has(cell)) {
+                gridMap.set(cell, table.id);
+                table._tempCell = cell;
+            } else {
+                // Find next free cell
+                for (let c = 0; c < MAX_TABLES; c++) {
+                    if (!gridMap.has(c)) {
+                        gridMap.set(c, table.id);
+                        table._tempCell = c;
+                        break;
+                    }
+                }
             }
         });
 
-        const elementsMap = new Map();
-
-        globalState.tables.forEach((table, i) => {
-            const el = document.createElement('div');
-            el.className = 'table-card-absolute table-status-libre';
-            el.textContent = table.id;
-            el.dataset.id = table.id;
-            
-            // Round existing coordinates to nearest grid point
-            const GRID_SIZE = 5;
-            let x = table.x !== undefined ? table.x : (i % 5) * 15 + 5;
-            let y = table.y !== undefined ? table.y : Math.floor(i / 5) * 20 + 5;
-            
-            x = Math.round(x / GRID_SIZE) * GRID_SIZE;
-            y = Math.round(y / GRID_SIZE) * GRID_SIZE;
-            
-            el.style.left = x + '%';
-            el.style.top = y + '%';
-            table.newX = x;
-            table.newY = y;
-            
-            elementsMap.set(table.id, { el, table });
-
-            const startDrag = (e) => {
-                if (multiSelectMode) {
-                    if (selectedTables.has(table.id)) {
-                        selectedTables.delete(table.id);
-                        el.style.boxShadow = '';
-                        return; // Just toggled off, don't drag
-                    } else {
-                        selectedTables.add(table.id);
-                        el.style.boxShadow = '0 0 0 3px var(--color-primary)';
-                    }
-                } else {
-                    if (!selectedTables.has(table.id)) {
-                        selectedTables.clear();
-                        document.querySelectorAll('.table-card-absolute').forEach(e => e.style.boxShadow = '');
-                        selectedTables.add(table.id);
-                        el.style.boxShadow = '0 0 0 3px var(--color-primary)';
-                    }
+        container.innerHTML = `
+            <style>
+                #grid-editor-wrap {
+                    padding: 1.5rem;
+                    max-width: 1100px;
+                    margin: 0 auto;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 1rem;
+                    height: 100%;
                 }
+                #grid-editor-header {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    flex-wrap: wrap;
+                    gap: .75rem;
+                }
+                #grid-editor-header h2 { margin: 0; font-size: 1.2rem; }
+                #grid-editor-legend {
+                    display: flex;
+                    gap: 1rem;
+                    font-size: .8rem;
+                    color: var(--color-text-muted);
+                    flex-wrap: wrap;
+                }
+                #editor-grid {
+                    display: grid;
+                    grid-template-columns: repeat(${COLS}, 1fr);
+                    grid-template-rows: repeat(${ROWS}, 1fr);
+                    gap: 6px;
+                    flex: 1;
+                    background: var(--color-surface);
+                    border: 2px solid var(--color-border);
+                    border-radius: 12px;
+                    padding: 10px;
+                    min-height: 340px;
+                }
+                .grid-cell {
+                    border: 2px dashed var(--color-border);
+                    border-radius: 8px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    min-height: 52px;
+                    position: relative;
+                    transition: background .12s, border-color .12s;
+                    cursor: default;
+                }
+                .grid-cell.cell-occupied { border-style: solid; border-color: transparent; }
+                .grid-cell.drag-over {
+                    background: rgba(214,31,44,.15);
+                    border-color: var(--color-primary);
+                    border-style: solid;
+                }
+                .table-chip {
+                    width: 100%;
+                    height: 100%;
+                    border-radius: 7px;
+                    background: var(--color-primary);
+                    color: #fff;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-weight: 800;
+                    font-size: .95rem;
+                    cursor: grab;
+                    user-select: none;
+                    box-shadow: 0 2px 8px rgba(0,0,0,.3);
+                    transition: transform .12s, box-shadow .12s;
+                }
+                .table-chip:active { cursor: grabbing; transform: scale(.97); }
+                .table-chip.dragging {
+                    opacity: .5;
+                    transform: scale(.9);
+                }
+            </style>
+            <div id="grid-editor-wrap">
+                <div id="grid-editor-header">
+                    <h2><i class='bx bx-grid-alt'></i> Editor de Plano</h2>
+                    <div id="grid-editor-legend">
+                        <span>📐 Cuadrícula: ${COLS} × ${ROWS} = ${MAX_TABLES} celdas máx.</span>
+                        <span>🟥 ${globalState.tables.length} mesa${globalState.tables.length !== 1 ? 's' : ''} configurada${globalState.tables.length !== 1 ? 's' : ''}</span>
+                    </div>
+                    <div style="display:flex;gap:.5rem;">
+                        <button class="btn btn-secondary" id="btn-editor-cancel">↩ Volver</button>
+                        <button class="btn btn-primary" id="btn-editor-save">💾 Guardar Plano</button>
+                    </div>
+                </div>
+                <div id="editor-grid">
+                    ${Array.from({length: ROWS * COLS}, (_, i) => `<div class="grid-cell" data-cell="${i}"></div>`).join('')}
+                </div>
+                <p style="font-size:.8rem;color:var(--color-text-muted);text-align:center;margin:0;">
+                    Arrastra las mesas para reposicionarlas en la cuadrícula. Las celdas vacías quedan disponibles.
+                </p>
+            </div>
+        `;
 
-                isDragging = true;
-                activeDragEl = el;
-                dragStartClient = {
-                    x: e.touches ? e.touches[0].clientX : e.clientX,
-                    y: e.touches ? e.touches[0].clientY : e.clientY
-                };
-                
-                // Store initial positions of all selected elements
-                initialPositions.clear();
-                selectedTables.forEach(id => {
-                    const t = elementsMap.get(id).table;
-                    initialPositions.set(id, { x: t.newX, y: t.newY });
+        const grid = document.getElementById('editor-grid');
+
+        // Paint initial state
+        const renderGrid = () => {
+            // Rebuild gridMap from _tempCell
+            const cellToTable = new Map();
+            globalState.tables.forEach(t => {
+                if (t._tempCell !== undefined) cellToTable.set(t._tempCell, t);
+            });
+
+            grid.querySelectorAll('.grid-cell').forEach(cell => {
+                const idx = parseInt(cell.dataset.cell);
+                const table = cellToTable.get(idx);
+                cell.innerHTML = '';
+                cell.classList.remove('cell-occupied');
+                if (table) {
+                    cell.classList.add('cell-occupied');
+                    const chip = document.createElement('div');
+                    chip.className = 'table-chip';
+                    chip.draggable = true;
+                    chip.dataset.tableId = table.id;
+                    chip.innerHTML = `
+                        <div style="text-align:center;line-height:1.2;">
+                            <div style="font-size:1rem;">${String(table.id).padStart(2,'0')}</div>
+                            ${table.zone ? `<div style="font-size:.6rem;opacity:.7;">${table.zone}</div>` : ''}
+                        </div>`;
+                    cell.appendChild(chip);
+                }
+            });
+            bindDrag();
+        };
+
+        let dragTableId = null;
+        let dragSourceCell = null;
+
+        const bindDrag = () => {
+            grid.querySelectorAll('.table-chip').forEach(chip => {
+                chip.addEventListener('dragstart', e => {
+                    dragTableId = parseInt(chip.dataset.tableId);
+                    dragSourceCell = parseInt(chip.closest('.grid-cell').dataset.cell);
+                    chip.classList.add('dragging');
+                    e.dataTransfer.effectAllowed = 'move';
                 });
-            };
+                chip.addEventListener('dragend', () => {
+                    chip.classList.remove('dragging');
+                    grid.querySelectorAll('.grid-cell').forEach(c => c.classList.remove('drag-over'));
+                });
+            });
 
-            el.addEventListener('mousedown', startDrag);
-            el.addEventListener('touchstart', startDrag, {passive: false});
-            area.appendChild(el);
-        });
+            grid.querySelectorAll('.grid-cell').forEach(cell => {
+                cell.addEventListener('dragover', e => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    grid.querySelectorAll('.grid-cell').forEach(c => c.classList.remove('drag-over'));
+                    cell.classList.add('drag-over');
+                });
+                cell.addEventListener('dragleave', () => cell.classList.remove('drag-over'));
+                cell.addEventListener('drop', e => {
+                    e.preventDefault();
+                    cell.classList.remove('drag-over');
+                    const targetCell = parseInt(cell.dataset.cell);
+                    if (targetCell === dragSourceCell || dragTableId === null) return;
 
-        const moveHandler = (e) => {
-            if (!isDragging || !activeDragEl) return;
-            e.preventDefault();
-            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                    // Check if target is occupied — swap
+                    const targetTable = globalState.tables.find(t => t._tempCell === targetCell);
+                    const sourceTable = globalState.tables.find(t => t.id === dragTableId);
 
-            const rect = area.getBoundingClientRect();
-            
-            // Calculate delta in percentages
-            const deltaX = ((clientX - dragStartClient.x) / rect.width) * 100;
-            const deltaY = ((clientY - dragStartClient.y) / rect.height) * 100;
-            
-            const GRID_SIZE = 5;
+                    if (targetTable) {
+                        // Swap positions
+                        targetTable._tempCell = dragSourceCell;
+                    }
+                    if (sourceTable) {
+                        sourceTable._tempCell = targetCell;
+                    }
 
-            selectedTables.forEach(id => {
-                const item = elementsMap.get(id);
-                const initPos = initialPositions.get(id);
-                if (initPos) {
-                    let newX = initPos.x + deltaX;
-                    let newY = initPos.y + deltaY;
-                    
-                    // Keep within bounds
-                    newX = Math.max(0, Math.min(newX, 100));
-                    newY = Math.max(0, Math.min(newY, 100));
-                    
-                    // Snap to grid
-                    newX = Math.round(newX / GRID_SIZE) * GRID_SIZE;
-                    newY = Math.round(newY / GRID_SIZE) * GRID_SIZE;
-                    
-                    item.el.style.left = newX + '%';
-                    item.el.style.top = newY + '%';
-                    item.table.newX = newX;
-                    item.table.newY = newY;
-                }
+                    dragTableId = null;
+                    dragSourceCell = null;
+                    renderGrid();
+                });
+            });
+
+            // Touch drag for mobile
+            let touchDragId = null, touchSourceCellIdx = null;
+            grid.querySelectorAll('.table-chip').forEach(chip => {
+                chip.addEventListener('touchstart', e => {
+                    touchDragId = parseInt(chip.dataset.tableId);
+                    touchSourceCellIdx = parseInt(chip.closest('.grid-cell').dataset.cell);
+                    chip.classList.add('dragging');
+                }, {passive:true});
+
+                chip.addEventListener('touchend', e => {
+                    chip.classList.remove('dragging');
+                    const touch = e.changedTouches[0];
+                    const el = document.elementFromPoint(touch.clientX, touch.clientY);
+                    const targetCell = el?.closest('.grid-cell');
+                    if (!targetCell || !touchDragId) return;
+                    const targetIdx = parseInt(targetCell.dataset.cell);
+                    if (targetIdx === touchSourceCellIdx) return;
+
+                    const targetTable = globalState.tables.find(t => t._tempCell === targetIdx);
+                    const srcTable = globalState.tables.find(t => t.id === touchDragId);
+                    if (targetTable) targetTable._tempCell = touchSourceCellIdx;
+                    if (srcTable) srcTable._tempCell = targetIdx;
+
+                    touchDragId = null;
+                    touchSourceCellIdx = null;
+                    renderGrid();
+                });
             });
         };
 
-        const endHandler = () => {
-            isDragging = false;
-            activeDragEl = null;
-        };
-
-        window.addEventListener('mousemove', moveHandler);
-        window.addEventListener('touchmove', moveHandler, {passive:false});
-        window.addEventListener('mouseup', endHandler);
-        window.addEventListener('touchend', endHandler);
+        renderGrid();
 
         document.getElementById('btn-editor-cancel').addEventListener('click', () => {
-            window.removeEventListener('mousemove', moveHandler);
-            window.removeEventListener('touchmove', moveHandler);
-            window.removeEventListener('mouseup', endHandler);
-            window.removeEventListener('touchend', endHandler);
+            globalState.tables.forEach(t => delete t._tempCell);
             render();
         });
-        
+
         document.getElementById('btn-editor-save').addEventListener('click', () => {
             globalState.tables.forEach(t => {
-                if (t.newX !== undefined) { 
-                    t.x = t.newX; 
-                    t.y = t.newY; 
-                    delete t.newX; 
-                    delete t.newY;
+                if (t._tempCell !== undefined) {
+                    t.gridCell = t._tempCell;
+                    // Also keep % coords for backward compat with mobile view
+                    t.x = Math.round(((t._tempCell % COLS) / COLS) * 100);
+                    t.y = Math.round((Math.floor(t._tempCell / COLS) / ROWS) * 100);
+                    delete t._tempCell;
                 }
             });
             storage.saveState('tables', globalState.tables);
-            app.showToast('Plano guardado');
-            window.removeEventListener('mousemove', moveHandler);
-            window.removeEventListener('touchmove', moveHandler);
-            window.removeEventListener('mouseup', endHandler);
-            window.removeEventListener('touchend', endHandler);
+            globalState.notifyListeners('tables');
+            app.showToast('✅ Plano guardado');
             render();
         });
     };
