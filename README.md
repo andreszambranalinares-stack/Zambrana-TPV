@@ -1,4 +1,4 @@
-# 🍷 Zambrana TPV v1.4
+# 🍷 Zambrana TPV v1.5
 
 **Zambrana TPV** es un sistema de gestión de punto de venta (TPV) de última generación, diseñado específicamente para el sector de la hostelería. Esta aplicación es una **PWA (Progressive Web App)** moderna que combina la potencia de un software de escritorio con la versatilidad de una aplicación móvil.
 
