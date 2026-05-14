@@ -15,6 +15,9 @@
     --color-occupied: #E74C3C;
     --color-reserved: #F5A623;
     --color-closed: #7F8C8D;
+    --color-danger: #E74C3C;
+    --color-warning: #F5A623;
+
     
     /* Elegant Shadows */
     --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
@@ -94,6 +97,9 @@ header h1 { font-size: 1.1rem; font-weight: 700; display:flex; align-items:cente
 
 /* Main App Container */
 #app-container { min-height: calc(100vh - 60px); display: flex; flex-direction: column; width: 100%; max-width: 100vw;}
+/* When header is hidden (admin/camarero mobile), container fills full height */
+header.hidden ~ #app-container { min-height: 100vh; }
+
 
 /* Home / Role Selection - Mobile First */
 .home-view {
@@ -397,6 +403,90 @@ header h1 { font-size: 1.1rem; font-weight: 700; display:flex; align-items:cente
 /* Employee table: always horizontal scroll */
 .emp-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .emp-table-wrap table { min-width: 560px; width: 100%; border-collapse: collapse; }
+
+/* ── ADMIN MOBILE LAYOUT ─────────────────────────────────────────────── */
+.admin-mobile-layout {
+    display: flex; flex-direction: column; height: 100vh;
+    background: var(--color-bg); overflow: hidden;
+}
+.admin-mobile-topbar {
+    background: var(--color-surface); border-bottom: 1px solid var(--color-border);
+    padding: 0 1rem; height: 58px; display: flex; align-items: center;
+    justify-content: space-between; flex-shrink: 0; z-index: 10;
+    box-shadow: var(--shadow-sm);
+}
+.admin-mobile-topbar-title { font-weight: 800; font-size: 1rem; color: var(--color-text); display: flex; align-items: center; gap: .5rem; }
+.admin-mobile-topbar-title i { color: var(--color-primary-light); font-size: 1.2rem; }
+.admin-mobile-scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: 90px; }
+
+/* Bottom nav for admin mobile */
+.admin-bottom-nav {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: var(--color-surface); border-top: 1px solid var(--color-border);
+    display: flex; align-items: center; height: 68px;
+    padding-bottom: env(safe-area-inset-bottom);
+    z-index: 100; box-shadow: 0 -4px 20px rgba(0,0,0,.25);
+}
+.admin-bottom-btn {
+    flex: 1; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 3px; height: 100%;
+    color: var(--color-text-muted); background: none; border: none;
+    cursor: pointer; transition: color .2s; font-size: 0; padding: 0;
+    position: relative;
+}
+.admin-bottom-btn i { font-size: 1.5rem; transition: transform .2s; }
+.admin-bottom-btn span { font-size: .65rem; font-weight: 700; }
+.admin-bottom-btn.active { color: var(--color-primary-light); }
+.admin-bottom-btn.active i { transform: translateY(-2px); }
+.admin-bottom-btn.active::after {
+    content: ''; position: absolute; bottom: 0; left: 25%; right: 25%;
+    height: 3px; background: var(--color-primary-light);
+    border-radius: 3px 3px 0 0;
+}
+
+/* Admin section header */
+.admin-section-header {
+    padding: 1rem; border-bottom: 1px solid var(--color-border);
+    background: var(--color-surface); display: flex;
+    align-items: center; justify-content: space-between; flex-shrink: 0;
+}
+.admin-section-title {
+    font-size: 1rem; font-weight: 800; color: var(--color-text);
+    display: flex; align-items: center; gap: .5rem;
+}
+.admin-section-title i { color: var(--color-primary-light); }
+
+/* Improved mobile table tiles */
+.mob-table-tile {
+    aspect-ratio: 1; border-radius: 14px; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: .2rem;
+    cursor: pointer; transition: all .2s; position: relative;
+    border: 2px solid var(--color-border); background: var(--color-surface);
+    padding: .6rem .3rem; text-align: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,.1);
+}
+.mob-table-tile:active { transform: scale(.94); }
+.mob-table-tile.occupied { border-color: var(--color-primary); background: linear-gradient(135deg, rgba(139,13,30,.15), rgba(214,31,44,.08)); }
+.mob-table-tile .tile-num { font-size: 1.35rem; font-weight: 800; line-height: 1; }
+.mob-table-tile .tile-guests { font-size: .68rem; color: var(--color-text-muted); display: flex; align-items: center; gap: 2px; }
+.mob-table-tile .tile-total { font-size: .78rem; font-weight: 700; color: var(--color-text); }
+.mob-table-tile .tile-status { font-size: .58rem; text-transform: uppercase; letter-spacing: .05em; font-weight: 700; }
+.mob-table-tile .tile-dot {
+    position: absolute; top: 7px; right: 7px; width: 8px; height: 8px;
+    background: var(--color-primary); border-radius: 50%;
+    box-shadow: 0 0 0 2px var(--color-bg), 0 0 6px var(--color-primary);
+    animation: pulse-dot 2s infinite;
+}
+@keyframes pulse-dot {
+    0%,100% { opacity: 1; transform: scale(1); }
+    50% { opacity: .7; transform: scale(1.2); }
+}
+
+/* Zone pills improved */
+.zone-pill-row { display: flex; gap: .4rem; overflow-x: auto; scrollbar-width: none; padding: .6rem 1rem; background: var(--color-surface); border-bottom: 1px solid var(--color-border); flex-shrink: 0; }
+.zone-pill-row::-webkit-scrollbar { display: none; }
+.zone-pill { flex-shrink: 0; padding: .35rem .9rem; border-radius: 20px; border: 1.5px solid var(--color-border); background: transparent; color: var(--color-text-muted); font-size: .78rem; font-weight: 700; cursor: pointer; transition: all .15s; }
+.zone-pill.active { background: var(--color-primary); border-color: var(--color-primary); color: #fff; box-shadow: 0 2px 8px rgba(139,13,30,.35); }
 
 /* Admin hamburger drawer */
 #admin-drawer { position: fixed; inset: 0; z-index: 2000; display: flex; }

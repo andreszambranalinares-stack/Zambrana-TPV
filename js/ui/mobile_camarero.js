@@ -101,38 +101,47 @@ export function renderMobileCamarero(container, app) {
         return `
         <div class="mob-full">
             <div class="mob-header">
-                <button id="btn-hamburger" style="background:none;border:none;color:#fff;cursor:pointer;font-size:1.5rem;flex-shrink:0;"><i class="bx bx-menu"></i></button>
+                <button id="btn-hamburger" style="background:none;border:none;color:#fff;cursor:pointer;font-size:1.5rem;flex-shrink:0;padding:.25rem;"><i class="bx bx-menu"></i></button>
                 <div style="flex:1;margin-left:.5rem;">
                     <div class="mob-header-title">${app.currentUser?.alias || 'Camarero'}</div>
-                    <div class="mob-header-sub">${occupied}/${tables.length} mesas ocupadas</div>
+                    <div class="mob-header-sub">${occupied}/${tables.length} mesas · ${occupied > 0 ? occupied + ' ocupada' + (occupied>1?'s':'') : 'todo libre'}</div>
                 </div>
-                <div style="background:rgba(255,255,255,.15);border-radius:20px;padding:.25rem .75rem;color:#fff;font-size:.8rem;font-weight:700;"><i class='bx bx-time'></i> ${new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</div>
+                <div style="background:rgba(255,255,255,.15);border-radius:20px;padding:.25rem .75rem;color:#fff;font-size:.8rem;font-weight:700;white-space:nowrap;"><i class='bx bx-time'></i> ${new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}</div>
+            </div>
+            <div class="zone-pill-row">
+                ${['Todas', 'Terraza', 'Salón', 'Barra', 'Privado'].map(z => `
+                    <button class="zone-pill ${tableFilter===z?'active':''}" data-mzone="${z}">${z}</button>
+                `).join('')}
             </div>
             <div class="mob-scroll" style="padding:1rem;">
-                <div style="display:flex; gap:0.5rem; overflow-x:auto; padding-bottom:1rem; margin-bottom:0.5rem; scrollbar-width:none;">
-                    ${['Todas', 'Terraza', 'Salón', 'Barra', 'Privado'].map(z => `
-                        <button class="mob-zone-pill ${tableFilter===z?'active':''}" data-mzone="${z}" style="flex-shrink:0; padding:0.4rem 1rem; border-radius:20px; border:1px solid var(--color-border); background:${tableFilter===z?'var(--color-primary)':'var(--color-surface)'}; color:${tableFilter===z?'#fff':'var(--color-text)'}; font-size:0.8rem; font-weight:700;">${z}</button>
-                    `).join('')}
-                </div>
                 <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:.75rem;">
-                    ${tables.map(t => {
-                        const isFiltered = tableFilter === 'Todas' || t.zone === tableFilter;
-                        const occ = t.status !== 'libre';
-                        const orders = globalState.orders.filter(o => o.tableId === t.id && o.status !== 'pagado');
-                        const total = orders.reduce((s, o) => s + o.items.reduce((ss, i) => ss + i.price * i.qty, 0), 0);
-                        return `
-                        <div class="mob-table-tile" data-table-id="${t.id}" style="background:${occ ? 'var(--color-surface)' : 'var(--color-surface)'};border:1px solid ${occ ? 'var(--color-primary)' : 'var(--color-border)'};box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);border-radius:14px;padding:.85rem .5rem;text-align:center;cursor:pointer;transition:all .2s;position:relative; opacity: ${isFiltered ? 1 : 0.4};">
-                            <div style="font-size:1.3rem;font-weight:800;color:${occ ? 'var(--color-primary)' : 'var(--color-text)'};">${String(t.id).padStart(2, '0')}</div>
-                            ${t.guests ? `<div style="font-size:.7rem;color:var(--color-text-muted);"><i class='bx bx-user'></i> ${t.guests}</div>` : ''}
-                            ${total ? `<div style="font-size:.78rem;font-weight:700;color:var(--color-text);">${total.toFixed(2)}€</div>` : ''}
-                            <div style="font-size:.62rem;margin-top:.2rem;color:${occ ? 'var(--color-primary)' : 'var(--color-text-muted)'};">${occ ? 'Ocupada' : 'Libre'}</div>
-                            ${occ ? `<div style="position:absolute;top:8px;right:8px;width:8px;height:8px;background:var(--color-primary);border-radius:50%;"></div>` : ``}
-                        </div>`;
-        }).join('')}
+                    ${(() => {
+                        const filtered = tableFilter === 'Todas' ? tables : tables.filter(t => t.zone === tableFilter);
+                        if (filtered.length === 0) {
+                            return `<div style="grid-column:1/-1;text-align:center;color:var(--color-text-muted);padding:2rem 0;">
+                                <i class='bx bx-map-pin' style="font-size:2rem;display:block;margin-bottom:.5rem;"></i>
+                                Sin mesas en <strong>${tableFilter}</strong>.<br>
+                                <span style="font-size:.75rem;">Asigna zonas desde Admin › Mesas</span>
+                            </div>`;
+                        }
+                        return filtered.map(t => {
+                            const occ = t.status !== 'libre';
+                            const orders = globalState.orders.filter(o => o.tableId === t.id && o.status !== 'pagado');
+                            const total = orders.reduce((s, o) => s + o.items.reduce((ss, i) => ss + i.price * i.qty, 0), 0);
+                            return `
+                            <div class="mob-table-tile ${occ ? 'occupied' : ''}" data-table-id="${t.id}">
+                                ${occ ? '<div class="tile-dot"></div>' : ''}
+                                <div class="tile-num" style="color:${occ ? 'var(--color-primary-light)' : 'var(--color-text)'};">${String(t.id).padStart(2, '0')}</div>
+                                ${t.guests ? `<div class="tile-guests"><i class='bx bx-user'></i> ${t.guests}</div>` : ''}
+                                ${total ? `<div class="tile-total">${total.toFixed(2)}€</div>` : ''}
+                                <div class="tile-status" style="color:${occ ? 'var(--color-primary-light)' : 'var(--color-text-muted)'};">${occ ? 'Ocupada' : 'Libre'}</div>
+                            </div>`;
+                        }).join('');
+                    })()}
                 </div>
-                <div style="margin-top:1.25rem;display:flex;justify-content:space-around;font-size:.72rem;color:var(--color-text-muted);">
-                    <span><span style="display:inline-block;width:10px;height:10px;background:var(--color-surface);border-radius:2px;border:1px solid var(--color-border);"></span> Libre</span>
-                    <span><span style="display:inline-block;width:10px;height:10px;background:var(--color-primary);border-radius:2px;"></span> Ocupada</span>
+                <div style="margin-top:1.5rem;display:flex;justify-content:center;gap:1.5rem;font-size:.72rem;color:var(--color-text-muted);">
+                    <span><span style="display:inline-block;width:10px;height:10px;background:var(--color-surface);border-radius:2px;border:1px solid var(--color-border);margin-right:4px;"></span>Libre</span>
+                    <span><span style="display:inline-block;width:10px;height:10px;background:var(--color-primary);border-radius:2px;margin-right:4px;"></span>Ocupada</span>
                 </div>
             </div>
         </div>
@@ -282,7 +291,7 @@ export function renderMobileCamarero(container, app) {
         });
 
         // Zone filters mobile
-        document.querySelectorAll('[data-mzone]').forEach(btn => {
+        document.querySelectorAll('.zone-pill[data-mzone]').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 tableFilter = btn.dataset.mzone;

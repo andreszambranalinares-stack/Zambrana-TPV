@@ -74,15 +74,25 @@ export const auth = {
         badge.className = 'admin-badge';
         badge.innerHTML = `
             <div id="btn-badge-admin-panel" style="position:absolute; bottom:calc(100% + 5px); left:0; background:var(--color-primary); color:white; padding:0.3rem 0.6rem; border-radius:10px; font-size:0.8rem; cursor:pointer; box-shadow:var(--shadow-md); display:flex; align-items:center; gap:0.3rem;">
-                ⚙️ Panel Admin
+                <i class='bx bx-cog'></i> Panel Admin
             </div>
-            ⚙️ Admin activo 
+            <i class='bx bx-cog'></i> Admin activo 
             <button id="btn-logout-admin" style="margin-left:0.5rem; background:white; color:black; border:none; padding:2px 6px; border-radius:10px; font-size:0.8rem; cursor:pointer;">Salir</button>
         `;
         document.body.appendChild(badge);
         
+        // Hide badge when mobile admin layout is active (has its own nav)
+        const updateBadgeVisibility = () => {
+            const hasMobileAdmin = !!document.querySelector('.admin-mobile-layout');
+            badge.style.display = hasMobileAdmin ? 'none' : '';
+        };
+        updateBadgeVisibility();
+        const observer = new MutationObserver(updateBadgeVisibility);
+        observer.observe(document.getElementById('app-container') || document.body, { childList: true, subtree: true });
+
         document.getElementById('btn-logout-admin').addEventListener('click', (e) => {
             e.stopPropagation();
+            observer.disconnect();
             this.logout();
             window.app.navigate('home');
         });

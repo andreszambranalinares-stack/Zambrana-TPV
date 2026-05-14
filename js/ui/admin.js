@@ -5,7 +5,261 @@ import { showModal, closeModal } from './common.js';
 import { deviceManager } from '../device.js';
 
 export function renderAdmin(container, app) {
+    // Track which section is active in mobile bottom nav
+    let mobileSection = 'servicio'; // servicio | turno | mesas | empleados | alertas
+
+    const isMobile = () => window.innerWidth < 768;
+
     const render = () => {
+        if (isMobile()) {
+            renderMobile();
+        } else {
+            renderDesktop();
+        }
+    };
+
+    // ── MOBILE LAYOUT ─────────────────────────────────────────────────────────
+    const renderMobile = () => {
+        const sections = [
+            { id: 'servicio', icon: 'bx-signal-5', label: 'Servicio' },
+            { id: 'turno',    icon: 'bx-time-five', label: 'Turno' },
+            { id: 'mesas',    icon: 'bx-grid-alt',  label: 'Mesas' },
+            { id: 'empleados',icon: 'bx-group',     label: 'Equipo' },
+            { id: 'alertas',  icon: 'bx-bell',      label: 'Alertas' },
+        ];
+
+        container.innerHTML = `
+        <div class="admin-mobile-layout">
+            <div class="admin-mobile-topbar">
+                <div class="admin-mobile-topbar-title">
+                    <i class='bx bx-cog'></i> Panel Admin
+                </div>
+                <button class="btn btn-secondary" id="btn-admin-exit"
+                    style="font-size:.8rem;padding:.35rem .7rem;display:flex;align-items:center;gap:.3rem;">
+                    <i class='bx bx-arrow-back'></i> Salir
+                </button>
+            </div>
+            <div class="admin-mobile-scroll" id="admin-mob-content">
+                ${renderMobileSection()}
+            </div>
+            <nav class="admin-bottom-nav">
+                ${sections.map(s => `
+                <button class="admin-bottom-btn ${mobileSection === s.id ? 'active' : ''}" data-mob-section="${s.id}">
+                    <i class='bx ${s.icon}'></i>
+                    <span>${s.label}</span>
+                </button>`).join('')}
+            </nav>
+        </div>`;
+
+        // Bind bottom nav
+        container.querySelectorAll('[data-mob-section]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                mobileSection = btn.dataset.mobSection;
+                render();
+            });
+        });
+
+        // Exit button
+        const btnExit = container.querySelector('#btn-admin-exit');
+        if (btnExit) btnExit.addEventListener('click', () => app.navigate('home'));
+
+        // ── Bind section-specific buttons inline ──────────────────────────────
+        // Shift buttons
+        const btnOpen = document.getElementById('btn-open-shift');
+        if (btnOpen) btnOpen.addEventListener('click', () => openShiftInline());
+        const btnClose = document.getElementById('btn-close-shift');
+        if (btnClose) btnClose.addEventListener('click', () => closeShiftInline());
+        const btnReset = document.getElementById('btn-reset-shift');
+        if (btnReset) btnReset.addEventListener('click', () => resetShiftInline());
+
+        // Table section
+        const numTablesEl = document.getElementById('input-num-tables');
+        if (numTablesEl) numTablesEl.addEventListener('change', e => {
+            globalState.updateConfig({ numTables: parseInt(e.target.value) });
+            render();
+        });
+        const btnEditor = document.getElementById('btn-table-editor');
+        if (btnEditor) btnEditor.addEventListener('click', () => renderTableEditor());
+        const btnAssignZone = document.getElementById('btn-assign-zone');
+        if (btnAssignZone) btnAssignZone.addEventListener('click', () => {
+            const zone = document.getElementById('zone-select').value;
+            const checked = Array.from(document.querySelectorAll('.zone-table-check:checked')).map(c => parseInt(c.value));
+            checked.forEach(id => globalState.updateTable(id, { zone }));
+            app.showToast(`Zona "${zone}" asignada a ${checked.length} mesas`);
+            render();
+        });
+
+        // Alerts section
+        const btnSaveAlerts = document.getElementById('btn-save-alerts');
+        if (btnSaveAlerts) btnSaveAlerts.addEventListener('click', () => {
+            globalState.updateConfig({
+                alertWarning: parseInt(document.getElementById('input-alert-warn').value),
+                alertDanger: parseInt(document.getElementById('input-alert-danger').value),
+                barAlertWarning: parseInt(document.getElementById('input-alert-bwarn').value),
+                barAlertDanger: parseInt(document.getElementById('input-alert-bdanger').value)
+            });
+            app.showToast('Alertas guardadas');
+        });
+
+        // Employees section
+        const btnAddEmp = document.getElementById('btn-add-emp');
+        if (btnAddEmp) btnAddEmp.addEventListener('click', () => openEmployeeForm());
+
+        // Archive / history buttons
+        const btnTickets = document.getElementById('btn-tickets-archive');
+        if (btnTickets) btnTickets.addEventListener('click', () => renderTicketsArchive());
+        const btnHistory = document.getElementById('btn-shift-history');
+        if (btnHistory) btnHistory.addEventListener('click', () => renderShiftHistory());
+    };
+
+    const renderMobileSection = () => {
+        switch (mobileSection) {
+            case 'servicio': return renderServicioSection();
+            case 'turno':    return renderTurnoSection();
+            case 'mesas':    return renderMesasSection();
+            case 'empleados':return renderEmpleadosSection();
+            case 'alertas':  return renderAlertasSection();
+            default:         return renderServicioSection();
+        }
+    };
+
+    // ── SECTION BUILDERS ──────────────────────────────────────────────────────
+    const renderServicioSection = () => `
+        <div style="padding:1rem;">
+            <div class="admin-section-header" style="margin:-1rem -1rem 1rem;padding:1rem;">
+                <div class="admin-section-title"><i class='bx bx-signal-5'></i> Estado en Vivo</div>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem;margin-bottom:1rem;">
+                <div class="admin-stat-card">
+                    <div class="stat-val">${deviceManager.getQueue('queue_cocina').length}</div>
+                    <div class="stat-lbl"><i class='bx bx-bowl-hot'></i> Cocina</div>
+                </div>
+                <div class="admin-stat-card">
+                    <div class="stat-val">${deviceManager.getQueue('queue_barra').length}</div>
+                    <div class="stat-lbl"><i class='bx bx-drink'></i> Barra</div>
+                </div>
+                <div class="admin-stat-card">
+                    <div class="stat-val" style="color:var(--color-free);">${globalState.tables.filter(t => t.status !== 'libre').length}</div>
+                    <div class="stat-lbl"><i class='bx bx-table'></i> Mesas</div>
+                </div>
+                <div class="admin-stat-card">
+                    <div class="stat-val">${Object.values(deviceManager.getDevices()).filter(d => (Date.now()-d.last_seen)<120000).length}</div>
+                    <div class="stat-lbl"><i class='bx bx-devices'></i> Dispositivos</div>
+                </div>
+                <div class="admin-stat-card">
+                    <div class="stat-val" style="font-size:1.3rem;">${calculateAverageWaitTime()} min</div>
+                    <div class="stat-lbl"><i class='bx bx-time'></i> Espera</div>
+                </div>
+                <div class="admin-stat-card">
+                    <div class="stat-val" style="font-size:.9rem;line-height:1.2;">${calculateBarraStats().topVentas}</div>
+                    <div class="stat-lbl"><i class='bx bx-trophy'></i> Top Ventas</div>
+                </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:.75rem;">
+                <button class="btn btn-secondary" id="btn-tickets-archive" style="width:100%;"><i class='bx bx-printer'></i> Archivo de Tickets</button>
+                <button class="btn btn-secondary" id="btn-shift-history" style="width:100%;"><i class='bx bx-history'></i> Historial de Turnos</button>
+            </div>
+        </div>`;
+
+    const renderTurnoSection = () => `
+        <div style="padding:1rem;">
+            <div class="admin-section-header" style="margin:-1rem -1rem 1rem;padding:1rem;">
+                <div class="admin-section-title"><i class='bx bx-time-five'></i> Estado del Turno</div>
+                <div style="font-size:.8rem;color:${globalState.shift.isOpen ? 'var(--color-free)' : 'var(--color-danger)'}; font-weight:700;">
+                    <i class="bx bxs-circle" style="font-size:.7rem;"></i> ${globalState.shift.isOpen ? 'Abierto' : 'Cerrado'}
+                </div>
+            </div>
+            <div class="widget" style="margin-bottom:1rem;">
+                <div class="value" style="color:${globalState.shift.isOpen ? 'var(--color-free)' : 'var(--color-danger)'}; margin-bottom:1rem;">
+                    ${globalState.shift.isOpen ? '<i class="bx bxs-circle" style="font-size:1rem;vertical-align:middle;"></i> Abierto' : '<i class="bx bxs-circle" style="font-size:1rem;vertical-align:middle;"></i> Cerrado'}
+                </div>
+                ${globalState.shift.isOpen
+                    ? `<button class="btn btn-primary" style="background:var(--color-danger);width:100%;margin-bottom:.5rem;" id="btn-close-shift"><i class='bx bx-x-circle'></i> Cerrar Turno</button>`
+                    : `<button class="btn btn-primary" style="width:100%;margin-bottom:.5rem;" id="btn-open-shift"><i class='bx bx-play-circle'></i> Abrir Turno</button>`
+                }
+                <button class="btn btn-secondary" style="width:100%;" id="btn-reset-shift"><i class='bx bx-reset'></i> Resetear Turno Completo</button>
+            </div>
+            <div class="widget">
+                <h3>Comandas (Hoy)</h3>
+                <div class="value">${tickets.getAllTickets().length}</div>
+            </div>
+        </div>`;
+
+    const renderMesasSection = () => `
+        <div style="padding:1rem;">
+            <div class="admin-section-header" style="margin:-1rem -1rem 1rem;padding:1rem;">
+                <div class="admin-section-title"><i class='bx bx-grid-alt'></i> Mesas y Plano</div>
+                <span style="font-size:.9rem;color:var(--color-text-muted);">${globalState.tables.filter(t=>t.status!=='libre').length}/${globalState.config.numTables}</span>
+            </div>
+            <div class="widget" style="margin-bottom:1rem;">
+                <h3>Número de mesas totales</h3>
+                <input type="number" id="input-num-tables" value="${globalState.config.numTables}" min="1" max="50" style="margin-top:.5rem;">
+            </div>
+            <div class="widget" style="margin-bottom:1rem;">
+                <h3>Asignar zona</h3>
+                <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin:.5rem 0;" id="zone-assign-btns">
+                    ${globalState.tables.map(t=>`<label style="display:flex;align-items:center;gap:4px;font-size:0.85rem;background:var(--color-bg);padding:.25rem .5rem;border-radius:6px;border:1px solid var(--color-border);"><input type="checkbox" class="zone-table-check" value="${t.id}"> M${String(t.id).padStart(2,'0')}</label>`).join('')}
+                </div>
+                <select id="zone-select" style="margin-bottom:.5rem;">
+                    <option value="Salón">Salón</option><option value="Terraza">Terraza</option>
+                    <option value="Barra">Barra</option><option value="Privado">Privado</option>
+                </select>
+                <button class="btn btn-secondary" style="width:100%;" id="btn-assign-zone">Asignar Zona</button>
+            </div>
+            <button class="btn btn-secondary" style="width:100%;" id="btn-table-editor"><i class='bx bx-edit-alt'></i> Editor de Plano</button>
+        </div>`;
+
+    const renderEmpleadosSection = () => `
+        <div style="padding:1rem;">
+            <div class="admin-section-header" style="margin:-1rem -1rem 1rem;padding:1rem;">
+                <div class="admin-section-title"><i class='bx bx-group'></i> Empleados</div>
+                <button class="btn btn-primary" id="btn-add-emp" style="font-size:.8rem;padding:.35rem .7rem;">+ Nuevo</button>
+            </div>
+            ${globalState.employees.map(emp => `
+            <div class="widget" style="margin-bottom:.75rem;display:flex;align-items:center;gap:1rem;">
+                <div style="width:44px;height:44px;border-radius:50%;background:${emp.color};color:white;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1.1rem;flex-shrink:0;">${emp.alias.charAt(0)}</div>
+                <div style="flex:1;min-width:0;">
+                    <div style="font-weight:700;font-size:.95rem;">${emp.alias}</div>
+                    <div style="font-size:.78rem;color:var(--color-text-muted);">${emp.role} · ${emp.isAdmin ? '<span style="color:var(--color-free);">Admin</span>' : 'Staff'} · <span style="color:${emp.active ? 'var(--color-free)' : 'var(--color-danger)'};">${emp.active ? 'Activo' : 'Inactivo'}</span></div>
+                </div>
+                <div style="display:flex;gap:.4rem;flex-shrink:0;">
+                    <button class="btn btn-secondary" style="padding:.35rem .6rem;font-size:.8rem;" onclick="window.editEmployee('${emp.id}')"><i class='bx bx-edit'></i></button>
+                    <button class="btn btn-secondary" style="padding:.35rem .6rem;font-size:.8rem;border-color:var(--color-danger);color:var(--color-danger);" onclick="if(confirm('¿Eliminar a ${emp.alias}?')) window.deleteEmployee('${emp.id}')"><i class='bx bx-trash'></i></button>
+                </div>
+            </div>`).join('')}
+            ${globalState.employees.length === 0 ? '<div style="text-align:center;color:var(--color-text-muted);padding:2rem 0;"><i class=\'bx bx-group\' style=\'font-size:2rem;display:block;margin-bottom:.5rem;\'></i>Sin empleados aún</div>' : ''}
+        </div>`;
+
+    const renderAlertasSection = () => `
+        <div style="padding:1rem;">
+            <div class="admin-section-header" style="margin:-1rem -1rem 1rem;padding:1rem;">
+                <div class="admin-section-title"><i class='bx bx-bell'></i> Alertas de Tiempo</div>
+            </div>
+            <div class="widget">
+                <div style="display:flex;flex-direction:column;gap:1rem;">
+                    <label style="display:flex;justify-content:space-between;align-items:center;">
+                        <span><i class='bx bx-bowl-hot' style="color:var(--color-reserved);"></i> Cocina Aviso (min)</span>
+                        <input type="number" id="input-alert-warn" value="${globalState.config.alertWarning}" style="width:70px;text-align:center;">
+                    </label>
+                    <label style="display:flex;justify-content:space-between;align-items:center;">
+                        <span><i class='bx bx-bowl-hot' style="color:var(--color-danger);"></i> Cocina Peligro (min)</span>
+                        <input type="number" id="input-alert-danger" value="${globalState.config.alertDanger}" style="width:70px;text-align:center;">
+                    </label>
+                    <label style="display:flex;justify-content:space-between;align-items:center;">
+                        <span><i class='bx bx-drink' style="color:var(--color-reserved);"></i> Barra Aviso (min)</span>
+                        <input type="number" id="input-alert-bwarn" value="${globalState.config.barAlertWarning}" style="width:70px;text-align:center;">
+                    </label>
+                    <label style="display:flex;justify-content:space-between;align-items:center;">
+                        <span><i class='bx bx-drink' style="color:var(--color-danger);"></i> Barra Peligro (min)</span>
+                        <input type="number" id="input-alert-bdanger" value="${globalState.config.barAlertDanger}" style="width:70px;text-align:center;">
+                    </label>
+                    <button class="btn btn-primary" id="btn-save-alerts" style="width:100%;"><i class='bx bx-save'></i> Guardar Alertas</button>
+                </div>
+            </div>
+        </div>`;
+
+    // ── DESKTOP LAYOUT ────────────────────────────────────────────────────────
+    const renderDesktop = () => {
         container.innerHTML = `
             <div style="padding: 1rem; max-width: 1200px; margin: 0 auto; padding-bottom: 5rem;">
                 <h2 style="margin-bottom: 1rem;">Panel de Administración</h2>
@@ -151,14 +405,18 @@ export function renderAdmin(container, app) {
             document.getElementById('btn-reset-shift').addEventListener('click', resetShiftInline);
         }
 
-        document.getElementById('input-num-tables').addEventListener('change', (e) => {
+        const numTablesEl = document.getElementById('input-num-tables');
+        if (numTablesEl) numTablesEl.addEventListener('change', (e) => {
             globalState.updateConfig({ numTables: parseInt(e.target.value) });
             render();
         });
 
-        document.getElementById('btn-table-editor').addEventListener('click', renderTableEditor);
-        document.getElementById('btn-tickets-archive').addEventListener('click', renderTicketsArchive);
-        document.getElementById('btn-shift-history').addEventListener('click', renderShiftHistory);
+        const btnEditor = document.getElementById('btn-table-editor');
+        if (btnEditor) btnEditor.addEventListener('click', renderTableEditor);
+        const btnTickets = document.getElementById('btn-tickets-archive');
+        if (btnTickets) btnTickets.addEventListener('click', renderTicketsArchive);
+        const btnHistory = document.getElementById('btn-shift-history');
+        if (btnHistory) btnHistory.addEventListener('click', renderShiftHistory);
 
         const btnAssignZone = document.getElementById('btn-assign-zone');
         if (btnAssignZone) {
@@ -171,8 +429,8 @@ export function renderAdmin(container, app) {
             });
         }
 
-        
-        document.getElementById('btn-save-alerts').addEventListener('click', () => {
+        const btnSaveAlerts = document.getElementById('btn-save-alerts');
+        if (btnSaveAlerts) btnSaveAlerts.addEventListener('click', () => {
             globalState.updateConfig({
                 alertWarning: parseInt(document.getElementById('input-alert-warn').value),
                 alertDanger: parseInt(document.getElementById('input-alert-danger').value),
@@ -182,9 +440,63 @@ export function renderAdmin(container, app) {
             app.showToast('Alertas guardadas');
         });
 
-        document.getElementById('btn-add-emp').addEventListener('click', () => openEmployeeForm());
+        const btnAddEmp = document.getElementById('btn-add-emp');
+        if (btnAddEmp) btnAddEmp.addEventListener('click', () => openEmployeeForm());
     };
-    
+
+    // Shared event binder used by both mobile sections and desktop
+    const bindSectionEvents = () => {
+        if (document.getElementById('btn-open-shift')) {
+            document.getElementById('btn-open-shift').addEventListener('click', openShiftInline);
+        }
+        if (document.getElementById('btn-close-shift')) {
+            document.getElementById('btn-close-shift').addEventListener('click', closeShiftInline);
+        }
+        if (document.getElementById('btn-reset-shift')) {
+            document.getElementById('btn-reset-shift').addEventListener('click', resetShiftInline);
+        }
+
+        const numTablesEl = document.getElementById('input-num-tables');
+        if (numTablesEl) numTablesEl.addEventListener('change', (e) => {
+            globalState.updateConfig({ numTables: parseInt(e.target.value) });
+            render();
+        });
+
+        const btnEditor = document.getElementById('btn-table-editor');
+        if (btnEditor) btnEditor.addEventListener('click', renderTableEditor);
+        const btnTickets = document.getElementById('btn-tickets-archive');
+        if (btnTickets) btnTickets.addEventListener('click', renderTicketsArchive);
+        const btnHistory = document.getElementById('btn-shift-history');
+        if (btnHistory) btnHistory.addEventListener('click', renderShiftHistory);
+
+        const btnAssignZone = document.getElementById('btn-assign-zone');
+        if (btnAssignZone) {
+            btnAssignZone.addEventListener('click', () => {
+                const zone = document.getElementById('zone-select').value;
+                const checked = Array.from(document.querySelectorAll('.zone-table-check:checked')).map(c=>parseInt(c.value));
+                checked.forEach(id => globalState.updateTable(id, { zone }));
+                app.showToast(`Zona "${zone}" asignada a ${checked.length} mesas`);
+                render();
+            });
+        }
+
+        const btnSaveAlerts = document.getElementById('btn-save-alerts');
+        if (btnSaveAlerts) btnSaveAlerts.addEventListener('click', () => {
+            globalState.updateConfig({
+                alertWarning: parseInt(document.getElementById('input-alert-warn').value),
+                alertDanger: parseInt(document.getElementById('input-alert-danger').value),
+                barAlertWarning: parseInt(document.getElementById('input-alert-bwarn').value),
+                barAlertDanger: parseInt(document.getElementById('input-alert-bdanger').value)
+            });
+            app.showToast('Alertas guardadas');
+        });
+
+        const btnAddEmp = document.getElementById('btn-add-emp');
+        if (btnAddEmp) btnAddEmp.addEventListener('click', () => openEmployeeForm());
+        // ↑ These are the desktop-specific binds above. Shared binds come from bindSectionEvents
+    };
+
+
     const calculateAverageWaitTime = () => {
         const qC = deviceManager.getQueue('queue_cocina');
         const qB = deviceManager.getQueue('queue_barra');
@@ -287,64 +599,99 @@ export function renderAdmin(container, app) {
 
     const openShiftInline = () => {
         const activeEmps = globalState.employees.filter(e => e.active);
-        const html = `
-            <div style="padding:1rem; border:1px solid var(--color-border); border-radius:4px; margin-top:1rem;">
-                <h4>Selecciona empleados del turno:</h4>
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; margin:1rem 0; max-height:200px; overflow-y:auto;">
-                    ${activeEmps.map(emp => `
-                        <label style="display:flex; align-items:center; gap:0.5rem;">
-                            <input type="checkbox" class="shift-emp-check" value="${emp.id}" checked>
-                            ${emp.alias} (${emp.role})
-                        </label>
-                    `).join('')}
+        // Use a floating modal overlay so it works in both mobile and desktop
+        const existing = document.getElementById('shift-open-modal');
+        if (existing) existing.remove();
+
+        const ov = document.createElement('div');
+        ov.id = 'shift-open-modal';
+        ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);padding:1rem;';
+        ov.innerHTML = `
+            <div style="background:var(--color-surface);border:1px solid var(--color-border);border-radius:20px;padding:1.5rem;width:min(380px,94vw);max-height:80vh;overflow-y:auto;">
+                <div style="font-size:1.1rem;font-weight:800;margin-bottom:1rem;display:flex;align-items:center;gap:.5rem;">
+                    <i class='bx bx-play-circle' style="color:var(--color-free);"></i> Abrir Turno
                 </div>
-                <button class="btn btn-primary" id="btn-confirm-open">Confirmar Apertura</button>
-                <button class="btn btn-secondary" onclick="document.getElementById('sec-turno-form').remove()">Cancelar</button>
-            </div>
-        `;
-        const div = document.createElement('div');
-        div.id = 'sec-turno-form';
-        div.innerHTML = html;
-        document.getElementById('sec-turno').appendChild(div);
+                <div style="font-size:.85rem;color:var(--color-text-muted);margin-bottom:.75rem;">Selecciona los empleados del turno:</div>
+                <div style="display:flex;flex-direction:column;gap:.5rem;margin-bottom:1rem;max-height:200px;overflow-y:auto;">
+                    ${activeEmps.length > 0 ? activeEmps.map(emp => `
+                        <label style="display:flex;align-items:center;gap:.75rem;background:var(--color-bg);padding:.6rem .75rem;border-radius:10px;border:1px solid var(--color-border);cursor:pointer;">
+                            <input type="checkbox" class="shift-emp-check" value="${emp.id}" checked style="width:auto;min-height:auto;">
+                            <div>
+                                <div style="font-weight:600;font-size:.9rem;">${emp.alias}</div>
+                                <div style="font-size:.75rem;color:var(--color-text-muted);">${emp.role}</div>
+                            </div>
+                        </label>
+                    `).join('') : '<div style="color:var(--color-text-muted);font-size:.85rem;text-align:center;padding:1rem;">Sin empleados activos. Añade empleados en la sección Equipo.</div>'}
+                </div>
+                <button id="btn-confirm-open" class="btn btn-primary" style="width:100%;margin-bottom:.5rem;">
+                    <i class='bx bx-check'></i> Confirmar Apertura
+                </button>
+                <button id="btn-cancel-open" style="width:100%;padding:.5rem;background:none;border:none;color:var(--color-text-muted);cursor:pointer;font-size:.88rem;">Cancelar</button>
+            </div>`;
+        document.body.appendChild(ov);
 
         document.getElementById('btn-confirm-open').addEventListener('click', () => {
             const selected = Array.from(document.querySelectorAll('.shift-emp-check:checked')).map(c => c.value);
-            if (selected.length === 0) return alert('Selecciona al menos uno.');
             globalState.shift.isOpen = true;
             globalState.shift.startTime = Date.now();
             globalState.shift.activeEmployees = selected;
             globalState.shift.logs = [];
             globalState.logAction('Apertura de turno');
+            ov.remove();
             render();
         });
+        document.getElementById('btn-cancel-open').addEventListener('click', () => ov.remove());
+        ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
     };
 
     const closeShiftInline = () => {
-        if(confirm('¿Estás seguro de cerrar el turno? Se generará el informe final.')) {
-            globalState.logAction('Cierre de turno');
-            globalState.shift.isOpen = false;
-            
-            const summaryHtml = renderShiftSummaryHtml();
-            const history = storage.loadState('shiftHistory') || [];
-            history.unshift({ date: Date.now(), html: summaryHtml });
-            if (history.length > 7) history.pop();
-            storage.saveState('shiftHistory', history);
+        if (!confirm('¿Estás seguro de cerrar el turno? Se generará el informe final.')) return;
 
-            tickets.clearTickets();
-            globalState.resetShift();
-            render();
-            // Show summary in full view
-            container.innerHTML = `
-                <div style="padding: 2rem; max-width: 600px; margin: 0 auto;">
-                    <h2>Turno Cerrado</h2>
-                    <div style="background:var(--color-surface); padding:1rem; border-radius:8px; margin:1rem 0;">
-                        ${summaryHtml}
+        globalState.logAction('Cierre de turno');
+        globalState.shift.isOpen = false;
+
+        const summaryHtml = renderShiftSummaryHtml();
+        const history = storage.loadState('shiftHistory') || [];
+        history.unshift({ date: Date.now(), html: summaryHtml });
+        if (history.length > 7) history.pop();
+        storage.saveState('shiftHistory', history);
+
+        tickets.clearTickets();
+        globalState.resetShift();
+
+        // Show summary in a full-screen modal overlay (works in both mobile and desktop)
+        const existing = document.getElementById('shift-close-modal');
+        if (existing) existing.remove();
+
+        const ov = document.createElement('div');
+        ov.id = 'shift-close-modal';
+        ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px);padding:1rem;';
+        ov.innerHTML = `
+            <div style="background:var(--color-surface);border:1px solid var(--color-border);border-radius:20px;padding:1.5rem;width:min(420px,94vw);max-height:85vh;overflow-y:auto;display:flex;flex-direction:column;gap:1rem;">
+                <div style="display:flex;align-items:center;gap:.75rem;padding-bottom:1rem;border-bottom:1px solid var(--color-border);">
+                    <div style="width:44px;height:44px;border-radius:50%;background:var(--color-free);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                        <i class='bx bx-check' style="font-size:1.5rem;color:#fff;"></i>
                     </div>
-                    <button class="btn btn-primary" onclick="window.app.navigate('home')">Volver a Inicio</button>
+                    <div>
+                        <div style="font-weight:800;font-size:1.1rem;">Turno Cerrado</div>
+                        <div style="font-size:.8rem;color:var(--color-text-muted);">${new Date().toLocaleString('es-ES')}</div>
+                    </div>
                 </div>
-            `;
-        }
+                <div style="background:var(--color-bg);border-radius:12px;padding:1rem;">
+                    ${summaryHtml}
+                </div>
+                <button id="btn-shift-close-ok" class="btn btn-primary" style="width:100%;">
+                    <i class='bx bx-home'></i> Volver a Inicio
+                </button>
+            </div>`;
+        document.body.appendChild(ov);
+
+        document.getElementById('btn-shift-close-ok').addEventListener('click', () => {
+            ov.remove();
+            app.navigate('home');
+        });
     };
+
 
     const resetShiftInline = () => {
         if(confirm('⚠️ ¿Estás seguro de resetear el turno completamente? Esto borrará comandas activas sin generar informe.')) {

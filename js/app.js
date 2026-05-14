@@ -143,7 +143,12 @@ class App {
                     this.navigate('home');
                     return;
                 }
-                renderDesktop(this.container, this);
+                if (window.innerWidth <= 800) {
+                    // Mobile: use the mobile-first admin panel
+                    import('./ui/admin.js').then(m => m.renderAdmin(this.container, this));
+                } else {
+                    renderDesktop(this.container, this);
+                }
             } else if (view === 'carta') {
                 if (!auth.isAdmin() && !this.currentUser?.isAdmin) {
                     this.navigate('home');
@@ -168,6 +173,11 @@ class App {
     }
 
     openAdminDrawer(section) {
+        // On mobile, route dashboard directly to the mobile admin view
+        if (window.innerWidth <= 800 && section === 'dashboard') {
+            this.navigate('admin');
+            return;
+        }
         let drawer = document.getElementById('admin-drawer-overlay');
         if (!drawer) {
             drawer = document.createElement('div');
