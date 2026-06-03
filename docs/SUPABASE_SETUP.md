@@ -89,11 +89,57 @@ Para que se pueda "descargar"/instalar en móviles y en el PC de barra hace falt
   conexión** y, al volver, sincroniza solo (cola de pendientes).
 - **Admin → Copia de seguridad → Exportar**: descarga un `.json` con todo. *Importar* lo restaura.
 
+---
+
+## Paso 5 — Seguridad (Bloque A): cuenta segura para salarios
+
+A partir de esta versión:
+- **Los PIN de los empleados y la contraseña de administrador ya NO se guardan en texto plano**:
+  se guardan cifrados (hash SHA-256 salado). El `1234` por defecto se migra a hash la primera vez
+  que entras; cámbialo en **Admin → Cambiar contraseña admin**.
+- Los **importes de pagos/salarios** (`payments`) se pueden proteger para que solo un administrador
+  autenticado los lea/escriba, mientras el resto (mesas, comandas) sigue sincronizando libremente.
+
+### 5.1 Crear la cuenta de administrador en Supabase
+En Supabase: **Authentication → Users → Add user**. Crea un usuario con tu **email** y una
+**contraseña** fuerte (confirma el email o desactiva la confirmación para poder entrar ya).
+
+### 5.2 Endurecer la RLS solo para `payments`
+Ejecuta este SQL en el **SQL Editor**:
+
+```sql
+-- Sustituye la política abierta por dos reglas separadas:
+drop policy if exists "tenant_all" on app_state;
+
+-- 1) Operativo (mesas, comandas, carta, turnos…): acceso anónimo, para que los
+--    móviles de los camareros sincronicen sin login.
+create policy "operational_anon" on app_state
+  for all
+  using (key <> 'payments')
+  with check (key <> 'payments');
+
+-- 2) Pagos/salarios: solo administradores autenticados (cuenta del Paso 5.1).
+create policy "payments_admin_only" on app_state
+  for all
+  using (key = 'payments' and auth.role() = 'authenticated')
+  with check (key = 'payments' and auth.role() = 'authenticated');
+```
+
+### 5.3 Activar la cuenta segura en la app
+En **Admin → Cuenta segura (datos personales)** introduce el email y contraseña del Paso 5.1.
+Mientras la sesión segura esté activa, los importes de pagos se sincronizan; sin ella la app
+funciona igual, pero los importes de pagos no salen de este dispositivo.
+
+> Pendiente (siguiente iteración): mover DNI/teléfono/tarifa del empleado a una clave protegida
+> aparte, para cerrarlos igual que `payments` sin afectar al login rápido de los camareros.
+
+---
+
 ## Notas y límites (estructura inicial)
-- **Seguridad:** la política es abierta; no metas DNI/salarios reales en producción hasta el
-  Bloque 3 (login con Supabase Auth).
-- **Concurrencia:** el estado se guarda por "bloques" (todas las comandas en uno). Si dos
-  dispositivos escriben comandas en el mismísimo instante, podría perderse una. La robustez total
-  (una fila por comanda) es la siguiente iteración acordada.
+- **Seguridad:** PIN y contraseña ya van cifrados. Los **importes de pagos** se cierran con la
+  cuenta segura (Paso 5). El **DNI/teléfono** del empleado todavía viaja en la clave `employees`
+  (anónima) — pendiente de cerrar en la siguiente iteración.
+- **Concurrencia:** las comandas ahora se guardan **una fila por comanda** (clave `order_<id>`),
+  así dos dispositivos que envían a la vez ya no se pisan.
 - **Plan gratuito Supabase:** sobra para un restaurante; conviene exportar/archivar tickets
   antiguos de vez en cuando.

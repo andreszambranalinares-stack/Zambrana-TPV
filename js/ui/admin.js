@@ -2,6 +2,7 @@ import { globalState } from '../state.js';
 import { tickets } from '../tickets.js';
 import { storage } from '../storage.js';
 import { showModal, closeModal } from './common.js';
+import { auth } from '../auth.js';
 import { deviceManager } from '../device.js';
 
 // ── PAGOS A EMPLEADOS — helpers compartidos (módulo) ──────────────────────────
@@ -148,8 +149,76 @@ function triggerImport() {
     input.click();
 }
 
+// ── Cambiar contraseña de administrador (cifrada) ────────────────────────────
+function changeAdminPassword() {
+    const html = `
+        <div style="display:flex;flex-direction:column;gap:.75rem;">
+            <label>Nueva contraseña:</label>
+            <input type="password" id="adm-newpass" style="padding:.5rem;">
+            <label>Repetir contraseña:</label>
+            <input type="password" id="adm-newpass2" style="padding:.5rem;">
+            <div id="adm-pass-err" style="color:var(--color-danger);font-size:.85rem;min-height:18px;"></div>
+        </div>`;
+    const modalId = showModal('Cambiar contraseña admin', html, `<button class="btn btn-primary" id="btn-adm-pass-save">Guardar</button>`);
+    document.getElementById('btn-adm-pass-save').addEventListener('click', async () => {
+        const p1 = document.getElementById('adm-newpass').value;
+        const p2 = document.getElementById('adm-newpass2').value;
+        const err = document.getElementById('adm-pass-err');
+        if (p1.length < 4) { err.textContent = 'Mínimo 4 caracteres.'; return; }
+        if (p1 !== p2) { err.textContent = 'Las contraseñas no coinciden.'; return; }
+        await auth.setAdminPassword(p1);
+        closeModal(modalId);
+        if (window.app) window.app.showToast('🔒 Contraseña actualizada');
+    });
+}
+
+// ── Cuenta segura (Supabase Auth) para datos personales ──────────────────────
+async function manageSecureAccount() {
+    const client = storage.getCloudClient && storage.getCloudClient();
+    if (!client) {
+        alert('La sincronización en la nube no está configurada. La cuenta segura requiere Supabase activo (ver docs/SUPABASE_SETUP.md).');
+        return;
+    }
+    const secure = await auth.isSecure();
+    if (secure) {
+        const html = `<p style="color:var(--color-text-muted);">Cuenta segura <strong style="color:var(--color-free);">activa</strong>. Los datos personales (salarios) se sincronizan cifrados con la nube.</p>`;
+        const modalId = showModal('Cuenta segura', html, `<button class="btn btn-secondary" id="btn-sec-out">Cerrar sesión segura</button>`);
+        document.getElementById('btn-sec-out').addEventListener('click', async () => {
+            await auth.signOutSecure();
+            closeModal(modalId);
+            if (window.app) window.app.showToast('Sesión segura cerrada');
+        });
+        return;
+    }
+    const html = `
+        <div style="display:flex;flex-direction:column;gap:.75rem;">
+            <p style="color:var(--color-text-muted);font-size:.9rem;">Inicia sesión con la cuenta de administrador creada en Supabase para poder guardar y sincronizar datos personales (DNI, salarios) con seguridad.</p>
+            <label>Email:</label>
+            <input type="email" id="sec-email" style="padding:.5rem;">
+            <label>Contraseña:</label>
+            <input type="password" id="sec-pass" style="padding:.5rem;">
+            <div id="sec-err" style="color:var(--color-danger);font-size:.85rem;min-height:18px;"></div>
+        </div>`;
+    const modalId = showModal('Activar cuenta segura', html, `<button class="btn btn-primary" id="btn-sec-in">Entrar</button>`);
+    document.getElementById('btn-sec-in').addEventListener('click', async () => {
+        const email = document.getElementById('sec-email').value.trim();
+        const pass = document.getElementById('sec-pass').value;
+        const err = document.getElementById('sec-err');
+        err.textContent = 'Conectando…';
+        const res = await auth.signInSecure(email, pass);
+        if (res.ok) {
+            closeModal(modalId);
+            if (window.app) window.app.showToast('🛡️ Cuenta segura activada');
+        } else {
+            err.textContent = res.error || 'No se pudo iniciar sesión.';
+        }
+    });
+}
+
 window.exportBackup = exportBackup;
 window.triggerImport = triggerImport;
+window.changeAdminPassword = changeAdminPassword;
+window.manageSecureAccount = manageSecureAccount;
 
 // ── Pantalla dedicada de Personal / Pagos (usada por el panel de escritorio) ──
 export function renderPayroll(container, app) {
@@ -371,6 +440,8 @@ export function renderAdmin(container, app) {
                 <button class="btn btn-secondary" id="btn-shift-history" style="width:100%;"><i class='bx bx-history'></i> Historial de Turnos</button>
                 <button class="btn btn-secondary" onclick="window.exportBackup()" style="width:100%;"><i class='bx bx-download'></i> Exportar copia de seguridad</button>
                 <button class="btn btn-secondary" onclick="window.triggerImport()" style="width:100%;"><i class='bx bx-upload'></i> Importar copia</button>
+                <button class="btn btn-secondary" onclick="window.changeAdminPassword()" style="width:100%;"><i class='bx bx-lock-alt'></i> Cambiar contraseña admin</button>
+                <button class="btn btn-secondary" onclick="window.manageSecureAccount()" style="width:100%;"><i class='bx bx-shield-quarter'></i> Cuenta segura (datos personales)</button>
             </div>
         </div>`;
 
@@ -590,6 +661,8 @@ export function renderAdmin(container, app) {
                         <div style="display:flex;flex-direction:column;gap:0.5rem;">
                             <button class="btn btn-secondary" onclick="window.exportBackup()" style="width:100%;"><i class='bx bx-download'></i> Exportar copia</button>
                             <button class="btn btn-secondary" onclick="window.triggerImport()" style="width:100%;"><i class='bx bx-upload'></i> Importar copia</button>
+                            <button class="btn btn-secondary" onclick="window.changeAdminPassword()" style="width:100%;"><i class='bx bx-lock-alt'></i> Cambiar contraseña admin</button>
+                            <button class="btn btn-secondary" onclick="window.manageSecureAccount()" style="width:100%;"><i class='bx bx-shield-quarter'></i> Cuenta segura</button>
                         </div>
                     </div>
                 </div>
@@ -621,7 +694,7 @@ export function renderAdmin(container, app) {
                                             </td>
                                             <td style="padding:0.5rem;">${emp.role}</td>
                                             <td style="padding:0.5rem;">${emp.isAdmin ? '<i class="bx bx-check" style="color:var(--color-free);font-size:1.2rem;"></i> Sí' : '<i class="bx bx-x" style="color:var(--color-danger);font-size:1.2rem;"></i> No'}</td>
-                                            <td style="padding:0.5rem;">${emp.pin}</td>
+                                            <td style="padding:0.5rem;">${(emp.pinHash || emp.pin) ? '••••' : '—'}</td>
                                             <td style="padding:0.5rem; color:${emp.active ? 'var(--color-free)' : 'var(--color-danger)'};">${emp.active ? 'Activo' : 'Inactivo'}</td>
                                             <td style="padding:0.5rem;">
                                                 <button class="btn btn-secondary" style="padding:0.25rem 0.5rem; font-size:0.8rem;" onclick="window.editEmployee('${emp.id}')"><i class="bx bx-edit"></i> Editar</button>
@@ -735,7 +808,7 @@ export function renderAdmin(container, app) {
                 <input type="text" id="emp-alias" value="${eData.alias || ''}" style="padding:0.5rem;">
 
                 <label>PIN de 4 dígitos:</label>
-                <input type="text" id="emp-pin" value="${eData.pin || ''}" maxlength="4" style="padding:0.5rem;">
+                <input type="text" id="emp-pin" value="" maxlength="4" inputmode="numeric" placeholder="${isEdit ? '•••• (deja vacío para no cambiar)' : '4 dígitos'}" style="padding:0.5rem;">
 
                 <label>Rol principal:</label>
                 <select id="emp-role" style="padding:0.5rem;">
@@ -777,13 +850,18 @@ export function renderAdmin(container, app) {
 
         const modalId = showModal(isEdit ? 'Editar Empleado' : 'Nuevo Empleado', html, `<button class="btn btn-primary" id="btn-save-emp">Guardar Empleado</button>`);
 
-        document.getElementById('btn-save-emp').addEventListener('click', () => {
+        document.getElementById('btn-save-emp').addEventListener('click', async () => {
             const alias = document.getElementById('emp-alias').value.trim();
             const pin = document.getElementById('emp-pin').value.trim();
-            if (!alias || pin.length !== 4) return alert('El alias es obligatorio y el PIN debe tener 4 dígitos.');
+            const hasPin = !!(eData.pinHash || eData.pin);
+            if (!alias) return alert('El alias es obligatorio.');
+            if (pin.length > 0 && pin.length !== 4) return alert('El PIN debe tener 4 dígitos.');
+            if (!hasPin && pin.length !== 4) return alert('Define un PIN de 4 dígitos para el nuevo empleado.');
+
+            // Solo cifra un PIN nuevo si se ha escrito; si se deja vacío en edición, se mantiene.
+            if (pin.length === 4) await globalState.setEmployeePin(eData, pin);
 
             eData.alias = alias;
-            eData.pin = pin;
             eData.role = document.getElementById('emp-role').value;
             eData.color = document.getElementById('emp-color').value;
             eData.active = document.getElementById('emp-active').checked;

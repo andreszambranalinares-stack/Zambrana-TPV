@@ -70,6 +70,11 @@ export class StorageManager {
         }
     }
 
+    // Cliente Supabase activo (o null en modo local). Lo usa la cuenta segura (Auth).
+    getCloudClient() {
+        return this.cloud ? this.cloud.client : null;
+    }
+
     setSyncStatus(status) {
         this.syncStatus = status;
         if (this.onSyncStatus) this.onSyncStatus(status);
@@ -91,9 +96,14 @@ export class StorageManager {
     handleIncoming(data) {
         if (!data) return;
         if (data.type === 'STATE_UPDATE' && data.key !== undefined) {
-            // Mantener la caché local fresca (imprescindible entre dispositivos).
-            try { localStorage.setItem(`zambrana_${data.key}`, JSON.stringify(data.state)); }
-            catch (e) { /* ignore */ }
+            if (data.deleted) {
+                // Borrado entrante: quitar la clave de la caché local.
+                localStorage.removeItem(`zambrana_${data.key}`);
+            } else {
+                // Mantener la caché local fresca (imprescindible entre dispositivos).
+                try { localStorage.setItem(`zambrana_${data.key}`, JSON.stringify(data.state)); }
+                catch (e) { /* ignore */ }
+            }
         }
         this.notifyListeners(data);
     }
@@ -106,6 +116,14 @@ export class StorageManager {
         this.local.set(key, state);
         // 3. Nube (si está activa).
         if (this.cloud) this.cloud.set(key, state);
+    }
+
+    // Elimina una clave (p. ej. una comanda antigua) localmente y en la nube, y
+    // avisa al resto de pestañas/dispositivos para que la quiten también.
+    removeState(key) {
+        localStorage.removeItem(`zambrana_${key}`);
+        this.local.set(key, null, true);
+        if (this.cloud) this.cloud.remove(key);
     }
 
     loadState(key) {

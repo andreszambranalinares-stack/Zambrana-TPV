@@ -1,19 +1,62 @@
 import { showModal, closeModal } from './ui/common.js';
 import { globalState } from './state.js';
+import { storage } from './storage.js';
+import { makeHash, verifyHash } from './crypto.js';
 
 export const auth = {
     isAdmin() {
         return sessionStorage.getItem('admin_session') === 'true';
     },
 
-    login(username, password) {
-        if (username === 'admin' && password === '1234') {
+    // Verifica la contraseña de admin contra el hash guardado en config.
+    // Si todavía no hay hash (instalación nueva), acepta el '1234' por defecto una
+    // sola vez y lo migra a hash automáticamente.
+    async login(password) {
+        const cfg = globalState.config || {};
+        let ok = false;
+        if (cfg.adminPass && cfg.adminPass.hash) {
+            ok = await verifyHash(password, cfg.adminPass);
+        } else if (password === '1234') {
+            ok = true;
+            globalState.updateConfig({ adminPass: await makeHash('1234') });
+        }
+        if (ok) {
             sessionStorage.setItem('admin_session', 'true');
             this.renderAdminBadge();
             globalState.notifyListeners('auth');
             return true;
         }
         return false;
+    },
+
+    // Cambia la contraseña de administrador (guardada cifrada en config, sincroniza).
+    async setAdminPassword(newPass) {
+        const hashed = await makeHash(newPass);
+        globalState.updateConfig({ adminPass: hashed });
+    },
+
+    // ── Cuenta segura (Supabase Auth) para datos personales (salarios) ──────────
+    // Inicia sesión real en la nube. Mientras está activa, los datos protegidos por
+    // RLS (pagos/salarios) pueden leerse y escribirse. Es opcional: la app funciona
+    // sin ella, pero los importes de pagos no saldrán de este dispositivo.
+    async signInSecure(email, password) {
+        const client = storage.getCloudClient && storage.getCloudClient();
+        if (!client) return { ok: false, error: 'La nube no está configurada.' };
+        const { error } = await client.auth.signInWithPassword({ email, password });
+        if (error) return { ok: false, error: error.message };
+        return { ok: true };
+    },
+
+    async signOutSecure() {
+        const client = storage.getCloudClient && storage.getCloudClient();
+        if (client) await client.auth.signOut();
+    },
+
+    async isSecure() {
+        const client = storage.getCloudClient && storage.getCloudClient();
+        if (!client) return false;
+        const { data } = await client.auth.getSession();
+        return !!(data && data.session);
     },
 
     logout() {
@@ -32,9 +75,8 @@ export const auth = {
         const html = `
             <div style="display:flex; flex-direction:column; gap:1rem;">
                 <p style="text-align:center; color:var(--color-text-muted);">Zambrana TPV — Administración</p>
-                <input type="text" id="admin-user" placeholder="Usuario" value="admin">
                 <div style="position:relative;">
-                    <input type="password" id="admin-pass" placeholder="Contraseña" style="width:100%;">
+                    <input type="password" id="admin-pass" placeholder="Contraseña de administrador" style="width:100%;">
                     <button id="toggle-pass" style="position:absolute; right:10px; top:50%; transform:translateY(-50%); background:none; border:none; cursor:pointer;">👁️</button>
                 </div>
                 <div id="login-error" style="color:var(--color-danger); font-size:0.9rem; text-align:center; height:20px;"></div>
@@ -42,26 +84,29 @@ export const auth = {
             </div>
         `;
         const modalId = showModal('Acceso Admin', html);
-        
+
         document.getElementById('toggle-pass').addEventListener('click', (e) => {
             const input = document.getElementById('admin-pass');
             input.type = input.type === 'password' ? 'text' : 'password';
         });
 
-        document.getElementById('btn-login-submit').addEventListener('click', (e) => {
-            const user = document.getElementById('admin-user').value;
+        const submit = async () => {
             const pass = document.getElementById('admin-pass').value;
-            if (this.login(user, pass)) {
+            if (await this.login(pass)) {
                 closeModal(modalId);
                 if (onSuccess) onSuccess();
             } else {
                 const err = document.getElementById('login-error');
-                err.textContent = 'Credenciales incorrectas';
+                err.textContent = 'Contraseña incorrecta';
                 const modalContent = document.querySelector(`#${modalId} .modal-content`);
                 modalContent.classList.remove('shake');
                 void modalContent.offsetWidth; // trigger reflow
                 modalContent.classList.add('shake');
             }
+        };
+        document.getElementById('btn-login-submit').addEventListener('click', submit);
+        document.getElementById('admin-pass').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') submit();
         });
     },
 

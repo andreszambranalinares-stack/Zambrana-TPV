@@ -86,13 +86,16 @@ export function renderHome(container, app) {
 
         const modalId = showModal(`${roleFilter}s de turno hoy`, empsHtml);
 
-        const tryPin = (pinStr) => {
-            const emp = shiftEmps.find(e => e.pin === pinStr);
+        const tryPin = async (pinStr) => {
+            const emp = await globalState.findEmployeeByPin(shiftEmps, pinStr);
             if (emp) {
                 app.currentUser = emp;
                 deviceManager.linkEmployee(emp.alias);
                 closeModal(modalId);
                 app.navigate(viewDest);
+            } else {
+                const input = document.getElementById('pin-login');
+                if (input) { input.value = ''; input.placeholder = 'PIN incorrecto'; }
             }
         };
 

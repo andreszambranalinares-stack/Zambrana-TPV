@@ -34,11 +34,12 @@ export class SupabaseProvider extends SyncProvider {
             .on('postgres_changes',
                 { event: '*', schema: 'public', table: 'app_state', filter: `tenant_id=eq.${this.tenant}` },
                 (payload) => {
-                    const row = payload.new && Object.keys(payload.new).length ? payload.new : payload.old;
+                    const isDelete = payload.eventType === 'DELETE';
+                    const row = (!isDelete && payload.new && Object.keys(payload.new).length) ? payload.new : payload.old;
                     if (!row || row.key === undefined) return;
-                    if (row.source_id && row.source_id === this.deviceId) return; // ignora eco propio
+                    if (!isDelete && row.source_id && row.source_id === this.deviceId) return; // ignora eco propio
                     if (this.onRemoteChange) {
-                        this.onRemoteChange({ type: 'STATE_UPDATE', key: row.key, state: row.value });
+                        this.onRemoteChange({ type: 'STATE_UPDATE', key: row.key, state: isDelete ? null : row.value, deleted: isDelete });
                     }
                 })
             .subscribe(async (status) => {
@@ -103,6 +104,33 @@ export class SupabaseProvider extends SyncProvider {
         }
     }
 
+    // Elimina una fila (p. ej. comanda cerrada/archivada). Si no hay red, se encola
+    // como borrado pendiente (valor centinela __DELETE__).
+    async remove(key) {
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+            this._enqueue(key, '__DELETE__');
+            this._setStatus('offline');
+            return;
+        }
+        try {
+            const { error } = await this.client.from('app_state')
+                .delete()
+                .eq('tenant_id', this.tenant)
+                .eq('key', key);
+            if (error) {
+                console.error('[Supabase] remove', error);
+                this._enqueue(key, '__DELETE__');
+                this._setStatus('offline');
+            } else {
+                this._setStatus('online');
+            }
+        } catch (e) {
+            console.error('[Supabase] remove', e);
+            this._enqueue(key, '__DELETE__');
+            this._setStatus('offline');
+        }
+    }
+
     // ── Outbox: cola de envíos pendientes cuando no hay red ────────────────────
     _readOutbox() {
         try { return JSON.parse(localStorage.getItem(OUTBOX_KEY) || '{}'); }
@@ -125,13 +153,19 @@ export class SupabaseProvider extends SyncProvider {
         if (keys.length === 0) return;
         for (const key of keys) {
             try {
-                const { error } = await this.client.from('app_state').upsert({
-                    tenant_id: this.tenant,
-                    key,
-                    value: box[key],
-                    source_id: this.deviceId,
-                    updated_at: new Date().toISOString(),
-                }, { onConflict: 'tenant_id,key' });
+                let error;
+                if (box[key] === '__DELETE__') {
+                    ({ error } = await this.client.from('app_state')
+                        .delete().eq('tenant_id', this.tenant).eq('key', key));
+                } else {
+                    ({ error } = await this.client.from('app_state').upsert({
+                        tenant_id: this.tenant,
+                        key,
+                        value: box[key],
+                        source_id: this.deviceId,
+                        updated_at: new Date().toISOString(),
+                    }, { onConflict: 'tenant_id,key' }));
+                }
                 if (error) { console.error('[Supabase] flush', error); return; }
                 delete box[key];
                 this._writeOutbox(box);

@@ -1,6 +1,7 @@
 import { storage } from './storage.js';
 import { defaultMenu } from './data.js';
 import { deviceManager } from './device.js';
+import { makeHash, verifyHash } from './crypto.js';
 
 class State {
     constructor() {
@@ -16,11 +17,34 @@ class State {
 
         storage.subscribe((message) => {
             if (message.type === 'STATE_UPDATE') {
+                // Comandas: una fila por comanda (clave 'order_<id>'). Se fusionan en
+                // el array en memoria sin pisar las del resto de dispositivos.
+                if (typeof message.key === 'string' && message.key.startsWith('order_')) {
+                    this.applyOrderUpdate(message.key.slice('order_'.length), message.state, message.deleted);
+                    this.notifyListeners('orders');
+                    return;
+                }
                 this[message.key] = message.state;
                 this.notifyListeners(message.key);
             }
         });
     }
+
+    // Inserta/actualiza/elimina una comanda concreta en el array en memoria.
+    applyOrderUpdate(id, order, deleted) {
+        const idx = this.orders.findIndex(o => o.id === id);
+        if (deleted || order == null) {
+            if (idx > -1) this.orders.splice(idx, 1);
+        } else if (idx > -1) {
+            this.orders[idx] = order;
+        } else {
+            this.orders.push(order);
+        }
+    }
+
+    // Guarda una comanda como su propia fila; elimina su fila.
+    saveOrder(order) { storage.saveState('order_' + order.id, order); }
+    removeOrder(id) { storage.removeState('order_' + id); }
 
     loadInitialTables() {
         let stored = storage.loadState('tables');
@@ -55,7 +79,21 @@ class State {
     }
 
     loadInitialOrders() {
-        return storage.loadState('orders') || [];
+        // Nuevo modelo: una fila por comanda ('order_<id>').
+        const orderKeys = storage.getAllKeys().filter(k => k.startsWith('order_'));
+        if (orderKeys.length > 0) {
+            const arr = [];
+            orderKeys.forEach(k => { const o = storage.loadState(k); if (o) arr.push(o); });
+            return arr.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+        }
+        // Migración del modelo antiguo (todas las comandas en un único array 'orders').
+        const legacy = storage.loadState('orders');
+        if (legacy && Array.isArray(legacy) && legacy.length) {
+            legacy.forEach(o => { if (o && o.id) storage.saveState('order_' + o.id, o); });
+            storage.removeState('orders');
+            return legacy;
+        }
+        return [];
     }
 
     loadInitialConfig() {
@@ -172,6 +210,36 @@ class State {
         this.notifyListeners('employees');
     }
 
+    // ── PIN cifrado ────────────────────────────────────────────────────────────
+    // Verifica el PIN de un empleado contra su hash. Si el empleado aún tiene el
+    // PIN en texto plano (datos antiguos), lo acepta una vez y lo migra a hash.
+    async verifyEmployeePin(emp, pin) {
+        if (!emp) return false;
+        if (emp.pinHash) return await verifyHash(pin, emp.pinHash);
+        if (emp.pin != null && String(emp.pin) === String(pin)) {
+            emp.pinHash = await makeHash(pin);
+            delete emp.pin;
+            this.updateEmployee(emp.id, emp);
+            return true;
+        }
+        return false;
+    }
+
+    // Busca en una lista el primer empleado cuyo PIN coincide (async por el hash).
+    async findEmployeeByPin(emps, pin) {
+        for (const emp of (emps || [])) {
+            if (await this.verifyEmployeePin(emp, pin)) return emp;
+        }
+        return null;
+    }
+
+    // Asigna un PIN nuevo cifrado a un objeto empleado (no guarda; lo hace el caller).
+    async setEmployeePin(emp, pin) {
+        emp.pinHash = await makeHash(pin);
+        delete emp.pin;
+        return emp;
+    }
+
     // ── Pagos a empleados (nómina / adelantos / propinas) ──────────────────────
     addPayment(payment) {
         if (!Array.isArray(this.payments)) this.payments = [];
@@ -204,6 +272,7 @@ class State {
                 status: 'en_cocina', items: kitchenItems.map(item => ({...item, isReady: false}))
             };
             this.orders.push(newOrderK);
+            this.saveOrder(newOrderK);
             deviceManager.addOrderToQueue('cocina', newOrderK.id, orderData, kitchenItems);
         }
         if (barItems.length > 0) {
@@ -214,10 +283,10 @@ class State {
                 status: 'en_barra', items: barItems.map(item => ({...item, isReady: false}))
             };
             this.orders.push(newOrderB);
+            this.saveOrder(newOrderB);
             deviceManager.addOrderToQueue('barra', newOrderB.id, orderData, barItems);
         }
-        
-        storage.saveState('orders', this.orders);
+
         this.updateTable(orderData.tableId, { status: 'enviada' });
         this.notifyListeners('orders');
         
@@ -236,7 +305,7 @@ class State {
                     deviceManager.markOrderReady(order.dest, order.id);
                 }
             }
-            storage.saveState('orders', this.orders);
+            this.saveOrder(order);
             this.notifyListeners('orders');
         }
     }
@@ -245,7 +314,7 @@ class State {
         const order = this.orders.find(o => o.id === orderId);
         if (order && order.items[itemIndex]) {
             order.items[itemIndex].isReady = isReady;
-            storage.saveState('orders', this.orders);
+            this.saveOrder(order);
             this.notifyListeners('orders');
         }
     }
@@ -257,7 +326,7 @@ class State {
         if (readyItemIndices.length === order.items.length) {
             order.items.forEach(i => i.isReady = true);
             this.updateOrderStatus(orderId, 'listo');
-            // updateOrderStatus already handles deviceManager marking
+            // updateOrderStatus already handles deviceManager marking + save
             return;
         }
 
@@ -274,17 +343,20 @@ class State {
 
         order.items = pendingItems;
         this.orders.push(newOrder);
-        
-        storage.saveState('orders', this.orders);
+
+        this.saveOrder(order);
+        this.saveOrder(newOrder);
         this.notifyListeners('orders');
     }
 
     closeTable(tableId) {
         this.updateTable(tableId, { status: 'cerrada', guests: 0, name: '', openedAt: null });
         this.orders.forEach(o => {
-            if (o.tableId === tableId && o.status !== 'pagado') o.status = 'pagado';
+            if (o.tableId === tableId && o.status !== 'pagado') {
+                o.status = 'pagado';
+                this.saveOrder(o);
+            }
         });
-        storage.saveState('orders', this.orders);
         this.notifyListeners('orders');
     }
 
@@ -296,10 +368,12 @@ class State {
             name: '',
             openedAt: null
         }));
+        // Elimina cada comanda (su propia fila) en local y en la nube.
+        const prevOrders = this.orders;
         this.orders = [];
+        prevOrders.forEach(o => { if (o && o.id) this.removeOrder(o.id); });
         this.shiftStartTime = Date.now();
         storage.saveState('tables', this.tables);
-        storage.saveState('orders', this.orders);
         storage.saveState('shiftStart', this.shiftStartTime);
         this.notifyListeners('reset');
     }

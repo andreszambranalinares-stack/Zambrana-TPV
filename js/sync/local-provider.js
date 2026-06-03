@@ -45,8 +45,9 @@ export class LocalProvider extends SyncProvider {
     }
 
     // Propaga un cambio de estado a las demás pestañas de este equipo.
-    set(key, value) {
-        this._broadcast({ type: 'STATE_UPDATE', key, state: value });
+    // Con deleted=true indica que la clave debe eliminarse (p. ej. comanda cerrada).
+    set(key, value, deleted = false) {
+        this._broadcast({ type: 'STATE_UPDATE', key, state: value, deleted });
     }
 
     // Difunde un mensaje arbitrario (p.ej. { type:'NEW_ORDER' }) por el mismo canal.

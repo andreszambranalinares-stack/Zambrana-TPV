@@ -1,4 +1,4 @@
-const CACHE_NAME = 'zambrana-v3.0';
+const CACHE_NAME = 'zambrana-v3.1';
 const ASSETS = [
     './',
     './index.html',
@@ -7,6 +7,7 @@ const ASSETS = [
     './js/app.js',
     './js/auth.js',
     './js/config.js',
+    './js/crypto.js',
     './js/data.js',
     './js/device.js',
     './js/state.js',
