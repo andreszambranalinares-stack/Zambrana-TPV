@@ -77,6 +77,10 @@
     <!-- Modals Container -->
     <div id="modals-container"></div>
 
+    <!-- SDK de Supabase (sincronización en la nube). Script clásico: se ejecuta
+         antes que los módulos, así window.supabase está listo. Si no hay conexión
+         o no está configurado, la app funciona en modo local automáticamente. -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script type="module" src="js/app.js"></script>
 </body>
 </html>

@@ -9,6 +9,7 @@ class State {
         this.config = this.loadInitialConfig();
         this.menu = this.loadInitialMenu();
         this.employees = this.loadInitialEmployees();
+        this.payments = this.loadInitialPayments();
         this.shift = this.loadInitialShift();
         this.isKitchenPaused = false;
         this.listeners = [];
@@ -70,8 +71,12 @@ class State {
         const stored = storage.loadState('employees');
         if (stored && stored.length > 0) return stored;
         return [
-            { id: 'admin', name: 'Administrador', alias: 'Admin', role: 'Camarero', color: '#10B981', pin: '1234', active: true, favCategory: '⭐', isAdmin: true }
+            { id: 'admin', name: 'Administrador', alias: 'Admin', role: 'Camarero', color: '#10B981', pin: '1234', active: true, favCategory: '⭐', isAdmin: true, dni: '', phone: '', hireDate: '', rate: 0 }
         ];
+    }
+
+    loadInitialPayments() {
+        return storage.loadState('payments') || [];
     }
 
     loadInitialShift() {
@@ -165,6 +170,28 @@ class State {
         this.employees = this.employees.filter(e => e.id !== id);
         storage.saveState('employees', this.employees);
         this.notifyListeners('employees');
+    }
+
+    // ── Pagos a empleados (nómina / adelantos / propinas) ──────────────────────
+    addPayment(payment) {
+        if (!Array.isArray(this.payments)) this.payments = [];
+        this.payments.unshift(payment);
+        storage.saveState('payments', this.payments);
+        this.notifyListeners('payments');
+    }
+
+    deletePayment(id) {
+        this.payments = (this.payments || []).filter(p => p.id !== id);
+        storage.saveState('payments', this.payments);
+        this.notifyListeners('payments');
+    }
+
+    getPaymentsByEmployee(employeeId) {
+        return (this.payments || []).filter(p => p.employeeId === employeeId);
+    }
+
+    getEmployeeTotalPaid(employeeId) {
+        return this.getPaymentsByEmployee(employeeId).reduce((s, p) => s + (p.amount || 0), 0);
     }
 
     createOrders(kitchenItems, barItems, orderData) {

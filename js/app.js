@@ -69,6 +69,8 @@ class App {
 
         initSidebar(this);
 
+        this.setupSyncIndicator();
+
         // Service worker
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('sw.js').catch(err => console.error('SW Error', err));
@@ -95,6 +97,34 @@ class App {
 
         // Render initial view
         this.navigate('home');
+    }
+
+    setupSyncIndicator() {
+        const header = document.getElementById('main-header');
+        if (!header) return;
+
+        const el = document.createElement('div');
+        el.id = 'sync-indicator';
+        el.style.cssText = 'display:flex;align-items:center;gap:6px;font-size:.72rem;font-weight:700;padding:4px 10px;border-radius:20px;border:1px solid var(--color-border);background:var(--color-bg);white-space:nowrap;cursor:default;flex-shrink:0;margin-left:auto;margin-right:8px;';
+        const btnMenu = document.getElementById('btn-menu');
+        if (btnMenu) header.insertBefore(el, btnMenu);
+        else header.appendChild(el);
+
+        const STATES = {
+            local:      { color: '#9ca3af', label: 'Local',        title: 'Solo este dispositivo — la nube no está configurada (ver js/config.js).' },
+            connecting: { color: '#f59e0b', label: 'Conectando…',  title: 'Conectando con la nube…' },
+            online:     { color: '#22c55e', label: 'Sincronizado', title: 'Conectado y sincronizado con todos los dispositivos.' },
+            offline:    { color: '#ef4444', label: 'Sin conexión', title: 'Sin conexión: los cambios se guardan y se sincronizarán al recuperar la red.' },
+        };
+
+        const paint = (status) => {
+            const s = STATES[status] || STATES.local;
+            el.innerHTML = `<span style="width:9px;height:9px;border-radius:50%;background:${s.color};box-shadow:0 0 6px ${s.color};display:inline-block;"></span><span>${s.label}</span>`;
+            el.title = s.title;
+        };
+
+        paint(storage.syncStatus);
+        storage.onSyncStatus = (status) => paint(status);
     }
 
     applyTheme(theme) {

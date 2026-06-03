@@ -4,11 +4,217 @@ import { storage } from '../storage.js';
 import { showModal, closeModal } from './common.js';
 import { deviceManager } from '../device.js';
 
+// ── PAGOS A EMPLEADOS — helpers compartidos (módulo) ──────────────────────────
+const PAYMENT_TYPES = ['Nómina', 'Adelanto', 'Propina', 'Hora extra', 'Otro'];
+const PAYMENT_METHODS = ['Efectivo', 'Transferencia', 'Bizum'];
+
+const formatMoney = (n) => `${(n || 0).toFixed(2)} €`;
+
+function buildEmployeePayCard(emp) {
+    const empPayments = globalState.getPaymentsByEmployee(emp.id);
+    const total = empPayments.reduce((s, p) => s + (p.amount || 0), 0);
+    const last = empPayments[0];
+    const rateTxt = emp.rate ? `${formatMoney(emp.rate)}/h` : 'Sin tarifa';
+    return `
+        <div class="widget" style="margin-bottom:.75rem;display:flex;align-items:center;gap:1rem;">
+            <div style="width:44px;height:44px;border-radius:50%;background:${emp.color};color:white;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1.1rem;flex-shrink:0;">${(emp.alias || '?').charAt(0)}</div>
+            <div style="flex:1;min-width:0;">
+                <div style="font-weight:700;font-size:.95rem;">${emp.alias}</div>
+                <div style="font-size:.75rem;color:var(--color-text-muted);">${rateTxt} · Pagado: <strong style="color:var(--color-primary);">${formatMoney(total)}</strong></div>
+                <div style="font-size:.7rem;color:var(--color-text-muted);">${last ? `Último: ${formatMoney(last.amount)} · ${new Date(last.date).toLocaleDateString('es-ES')}` : 'Sin pagos aún'}</div>
+            </div>
+            <button class="btn btn-primary" style="padding:.45rem .8rem;font-size:.85rem;flex-shrink:0;" onclick="window.payEmployee('${emp.id}')"><i class='bx bx-money-withdraw'></i> Pagar</button>
+        </div>`;
+}
+
+function buildPaymentsHistory(limit = 10) {
+    const payments = (globalState.payments || []).slice(0, limit);
+    if (payments.length === 0) {
+        return '<div style="text-align:center;color:var(--color-text-muted);padding:1rem 0;font-size:.85rem;">Aún no se ha registrado ningún pago.</div>';
+    }
+    return payments.map(p => {
+        const emp = globalState.employees.find(e => e.id === p.employeeId);
+        return `
+        <div class="widget" style="margin-bottom:.5rem;display:flex;align-items:center;gap:.75rem;padding:.6rem .8rem;">
+            <div style="flex:1;min-width:0;">
+                <div style="font-weight:700;font-size:.88rem;">${emp ? emp.alias : 'Empleado eliminado'} <span style="font-weight:500;color:var(--color-text-muted);">· ${p.type}</span></div>
+                <div style="font-size:.72rem;color:var(--color-text-muted);">${new Date(p.date).toLocaleString('es-ES')} · ${p.method}${p.note ? ' · ' + p.note : ''}</div>
+            </div>
+            <div style="font-weight:800;font-size:1rem;color:var(--color-free);flex-shrink:0;">${formatMoney(p.amount)}</div>
+            <button class="btn btn-secondary" style="padding:.3rem .5rem;font-size:.8rem;border-color:var(--color-danger);color:var(--color-danger);flex-shrink:0;" onclick="if(confirm('¿Eliminar este pago del registro?')) window.deletePayment('${p.id}')"><i class='bx bx-trash'></i></button>
+        </div>`;
+    }).join('');
+}
+
+function openPaymentForm(emp, onDone) {
+    const app = window.app;
+    const today = new Date().toISOString().slice(0, 10);
+    const html = `
+        <div style="display:flex; flex-direction:column; gap:.9rem;">
+            <div style="display:flex;align-items:center;gap:.75rem;padding:.5rem 0;">
+                <div style="width:40px;height:40px;border-radius:50%;background:${emp.color};color:white;display:flex;align-items:center;justify-content:center;font-weight:800;">${(emp.alias || '?').charAt(0)}</div>
+                <div>
+                    <div style="font-weight:700;">${emp.alias}</div>
+                    <div style="font-size:.78rem;color:var(--color-text-muted);">${emp.role}${emp.rate ? ' · ' + formatMoney(emp.rate) + '/h' : ''}</div>
+                </div>
+            </div>
+
+            <label>Importe (€):</label>
+            <input type="number" id="pay-amount" min="0" step="0.01" placeholder="0.00" style="padding:0.5rem;font-size:1.1rem;font-weight:700;">
+
+            <label>Concepto:</label>
+            <select id="pay-type" style="padding:0.5rem;">
+                ${PAYMENT_TYPES.map(t => `<option value="${t}">${t}</option>`).join('')}
+            </select>
+
+            <label>Método de pago:</label>
+            <select id="pay-method" style="padding:0.5rem;">
+                ${PAYMENT_METHODS.map(m => `<option value="${m}">${m}</option>`).join('')}
+            </select>
+
+            <label>Fecha:</label>
+            <input type="date" id="pay-date" value="${today}" style="padding:0.5rem;">
+
+            <label>Nota (opcional):</label>
+            <input type="text" id="pay-note" placeholder="Ej: pago semana del 1 al 7" style="padding:0.5rem;">
+        </div>
+    `;
+
+    const modalId = showModal(`Pagar a ${emp.alias}`, html, `<button class="btn btn-primary" id="btn-save-pay"><i class='bx bx-check'></i> Registrar Pago</button>`);
+
+    document.getElementById('btn-save-pay').addEventListener('click', () => {
+        const amount = parseFloat(document.getElementById('pay-amount').value);
+        if (!amount || amount <= 0) return alert('Introduce un importe válido mayor que 0.');
+
+        const dateVal = document.getElementById('pay-date').value;
+        const payment = {
+            id: 'p_' + Date.now(),
+            employeeId: emp.id,
+            amount,
+            type: document.getElementById('pay-type').value,
+            method: document.getElementById('pay-method').value,
+            date: dateVal ? new Date(dateVal).getTime() : Date.now(),
+            note: document.getElementById('pay-note').value.trim(),
+            paidBy: app?.currentUser?.alias || 'Admin'
+        };
+
+        globalState.addPayment(payment);
+        closeModal(modalId);
+        if (app) app.showToast(`💸 Pago de ${formatMoney(amount)} registrado a ${emp.alias}`);
+        if (onDone) onDone();
+    });
+}
+
+// ── COPIA DE SEGURIDAD (Bloque 2): exportar / importar todo el estado ─────────
+function exportBackup() {
+    const data = {};
+    storage.getAllKeys().forEach(k => { data[k] = storage.loadState(k); });
+    const payload = { _app: 'ZambranaTPV', _version: 1, _date: new Date().toISOString(), data };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `zambrana-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    if (window.app) window.app.showToast('💾 Copia de seguridad descargada');
+}
+
+function triggerImport() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'application/json,.json';
+    input.onchange = () => {
+        const file = input.files && input.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+            try {
+                const parsed = JSON.parse(reader.result);
+                const data = parsed.data || parsed;
+                if (!data || typeof data !== 'object') throw new Error('Formato no válido');
+                if (!confirm('Esto reemplazará los datos de este dispositivo (y los sincronizará a la nube) con los de la copia. ¿Continuar?')) return;
+                Object.keys(data).forEach(k => storage.saveState(k, data[k]));
+                alert('Copia restaurada correctamente. La app se recargará.');
+                location.reload();
+            } catch (e) {
+                alert('No se pudo leer la copia: ' + e.message);
+            }
+        };
+        reader.readAsText(file);
+    };
+    input.click();
+}
+
+window.exportBackup = exportBackup;
+window.triggerImport = triggerImport;
+
+// ── Pantalla dedicada de Personal / Pagos (usada por el panel de escritorio) ──
+export function renderPayroll(container, app) {
+    const refresh = () => renderPayroll(container, app);
+    window.payEmployee = (id) => {
+        const emp = globalState.employees.find(e => e.id === id);
+        if (emp) openPaymentForm(emp, refresh);
+    };
+    window.deletePayment = (id) => {
+        globalState.deletePayment(id);
+        refresh();
+    };
+
+    const totalPagado = (globalState.payments || []).reduce((s, p) => s + (p.amount || 0), 0);
+    container.innerHTML = `
+        <div style="max-width:1100px;margin:0 auto;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem;">
+                <h2 style="margin:0;"><i class='bx bx-euro'></i> Personal y Pagos</h2>
+                <div style="font-size:.95rem;color:var(--color-text-muted);">Total pagado (histórico): <strong style="color:var(--color-primary);font-size:1.1rem;">${formatMoney(totalPagado)}</strong></div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 380px;gap:1.5rem;align-items:start;">
+                <div>
+                    <h3 style="margin-bottom:.75rem;font-size:1rem;color:var(--color-text-muted);">EMPLEADOS</h3>
+                    ${globalState.employees.map(emp => buildEmployeePayCard(emp)).join('')}
+                    ${globalState.employees.length === 0 ? '<div style="color:var(--color-text-muted);padding:2rem 0;">Añade empleados en Ajustes → Equipo para poder pagarles.</div>' : ''}
+                </div>
+                <div>
+                    <h3 style="margin-bottom:.75rem;font-size:1rem;color:var(--color-text-muted);">HISTORIAL DE PAGOS</h3>
+                    ${buildPaymentsHistory(20)}
+                </div>
+            </div>
+        </div>
+    `;
+}
+
 export function renderAdmin(container, app) {
     // Track which section is active in mobile bottom nav
     let mobileSection = 'servicio'; // servicio | turno | mesas | empleados | alertas
 
     const isMobile = () => window.innerWidth < 768;
+
+    // ── HELPER STATS (declared early so section builders can use them) ─────────
+    const calculateAverageWaitTime = () => {
+        const qC = deviceManager.getQueue('queue_cocina');
+        const qB = deviceManager.getQueue('queue_barra');
+        const all = [...qC, ...qB];
+        if (all.length === 0) return 0;
+        let total = 0;
+        all.forEach(o => total += (Date.now() - o.timestamp_entrada));
+        return Math.floor((total / all.length) / 60000);
+    };
+
+    const calculateBarraStats = () => {
+        const aB = deviceManager.getQueue('archive_barra');
+        const qB = deviceManager.getQueue('queue_barra');
+        const counts = {};
+        [...aB, ...qB].forEach(o => o.items.forEach(i => {
+            counts[i.name] = (counts[i.name] || 0) + i.qty;
+        }));
+        let top = 'Ninguna', max = 0;
+        for (const [name, qty] of Object.entries(counts)) {
+            if (qty > max) { max = qty; top = name; }
+        }
+        return { topVentas: top };
+    };
 
     const render = () => {
         if (isMobile()) {
@@ -23,8 +229,9 @@ export function renderAdmin(container, app) {
         const sections = [
             { id: 'servicio', icon: 'bx-signal-5', label: 'Servicio' },
             { id: 'turno',    icon: 'bx-time-five', label: 'Turno' },
-            { id: 'mesas',    icon: 'bx-grid-alt',  label: 'Mesas' },
             { id: 'empleados',icon: 'bx-group',     label: 'Equipo' },
+            { id: 'pagos',    icon: 'bx-euro',      label: 'Pagos' },
+            { id: 'mesas',    icon: 'bx-grid-alt',  label: 'Mesas' },
             { id: 'alertas',  icon: 'bx-bell',      label: 'Alertas' },
         ];
 
@@ -63,52 +270,55 @@ export function renderAdmin(container, app) {
         const btnExit = container.querySelector('#btn-admin-exit');
         if (btnExit) btnExit.addEventListener('click', () => app.navigate('home'));
 
-        // ── Bind section-specific buttons inline ──────────────────────────────
+        // ── Bind section-specific buttons (use container scope to avoid ID conflicts) ──
+        const q = (id) => container.querySelector('#' + id);
+        const qs = (sel) => container.querySelectorAll(sel);
+
         // Shift buttons
-        const btnOpen = document.getElementById('btn-open-shift');
+        const btnOpen = q('btn-open-shift');
         if (btnOpen) btnOpen.addEventListener('click', () => openShiftInline());
-        const btnClose = document.getElementById('btn-close-shift');
+        const btnClose = q('btn-close-shift');
         if (btnClose) btnClose.addEventListener('click', () => closeShiftInline());
-        const btnReset = document.getElementById('btn-reset-shift');
+        const btnReset = q('btn-reset-shift');
         if (btnReset) btnReset.addEventListener('click', () => resetShiftInline());
 
         // Table section
-        const numTablesEl = document.getElementById('input-num-tables');
+        const numTablesEl = q('input-num-tables');
         if (numTablesEl) numTablesEl.addEventListener('change', e => {
             globalState.updateConfig({ numTables: parseInt(e.target.value) });
             render();
         });
-        const btnEditor = document.getElementById('btn-table-editor');
+        const btnEditor = q('btn-table-editor');
         if (btnEditor) btnEditor.addEventListener('click', () => renderTableEditor());
-        const btnAssignZone = document.getElementById('btn-assign-zone');
+        const btnAssignZone = q('btn-assign-zone');
         if (btnAssignZone) btnAssignZone.addEventListener('click', () => {
-            const zone = document.getElementById('zone-select').value;
-            const checked = Array.from(document.querySelectorAll('.zone-table-check:checked')).map(c => parseInt(c.value));
+            const zone = q('zone-select').value;
+            const checked = Array.from(qs('.zone-table-check:checked')).map(c => parseInt(c.value));
             checked.forEach(id => globalState.updateTable(id, { zone }));
             app.showToast(`Zona "${zone}" asignada a ${checked.length} mesas`);
             render();
         });
 
         // Alerts section
-        const btnSaveAlerts = document.getElementById('btn-save-alerts');
+        const btnSaveAlerts = q('btn-save-alerts');
         if (btnSaveAlerts) btnSaveAlerts.addEventListener('click', () => {
             globalState.updateConfig({
-                alertWarning: parseInt(document.getElementById('input-alert-warn').value),
-                alertDanger: parseInt(document.getElementById('input-alert-danger').value),
-                barAlertWarning: parseInt(document.getElementById('input-alert-bwarn').value),
-                barAlertDanger: parseInt(document.getElementById('input-alert-bdanger').value)
+                alertWarning: parseInt(q('input-alert-warn').value),
+                alertDanger: parseInt(q('input-alert-danger').value),
+                barAlertWarning: parseInt(q('input-alert-bwarn').value),
+                barAlertDanger: parseInt(q('input-alert-bdanger').value)
             });
             app.showToast('Alertas guardadas');
         });
 
         // Employees section
-        const btnAddEmp = document.getElementById('btn-add-emp');
+        const btnAddEmp = q('btn-add-emp');
         if (btnAddEmp) btnAddEmp.addEventListener('click', () => openEmployeeForm());
 
         // Archive / history buttons
-        const btnTickets = document.getElementById('btn-tickets-archive');
+        const btnTickets = q('btn-tickets-archive');
         if (btnTickets) btnTickets.addEventListener('click', () => renderTicketsArchive());
-        const btnHistory = document.getElementById('btn-shift-history');
+        const btnHistory = q('btn-shift-history');
         if (btnHistory) btnHistory.addEventListener('click', () => renderShiftHistory());
     };
 
@@ -118,6 +328,7 @@ export function renderAdmin(container, app) {
             case 'turno':    return renderTurnoSection();
             case 'mesas':    return renderMesasSection();
             case 'empleados':return renderEmpleadosSection();
+            case 'pagos':    return renderPagosSection();
             case 'alertas':  return renderAlertasSection();
             default:         return renderServicioSection();
         }
@@ -158,6 +369,8 @@ export function renderAdmin(container, app) {
             <div style="display:flex;flex-direction:column;gap:.75rem;">
                 <button class="btn btn-secondary" id="btn-tickets-archive" style="width:100%;"><i class='bx bx-printer'></i> Archivo de Tickets</button>
                 <button class="btn btn-secondary" id="btn-shift-history" style="width:100%;"><i class='bx bx-history'></i> Historial de Turnos</button>
+                <button class="btn btn-secondary" onclick="window.exportBackup()" style="width:100%;"><i class='bx bx-download'></i> Exportar copia de seguridad</button>
+                <button class="btn btn-secondary" onclick="window.triggerImport()" style="width:100%;"><i class='bx bx-upload'></i> Importar copia</button>
             </div>
         </div>`;
 
@@ -229,6 +442,26 @@ export function renderAdmin(container, app) {
             </div>`).join('')}
             ${globalState.employees.length === 0 ? '<div style="text-align:center;color:var(--color-text-muted);padding:2rem 0;"><i class=\'bx bx-group\' style=\'font-size:2rem;display:block;margin-bottom:.5rem;\'></i>Sin empleados aún</div>' : ''}
         </div>`;
+
+    const renderPagosSection = () => {
+        const totalPagado = (globalState.payments || []).reduce((s, p) => s + (p.amount || 0), 0);
+        return `
+        <div style="padding:1rem;">
+            <div class="admin-section-header" style="margin:-1rem -1rem 1rem;padding:1rem;">
+                <div class="admin-section-title"><i class='bx bx-euro'></i> Pagos a Empleados</div>
+            </div>
+            <div class="widget" style="margin-bottom:1rem;display:flex;justify-content:space-between;align-items:center;">
+                <span style="font-size:.85rem;color:var(--color-text-muted);">Total pagado (histórico)</span>
+                <span style="font-size:1.3rem;font-weight:800;color:var(--color-primary);">${formatMoney(totalPagado)}</span>
+            </div>
+            ${globalState.employees.map(emp => buildEmployeePayCard(emp)).join('')}
+            ${globalState.employees.length === 0 ? '<div style="text-align:center;color:var(--color-text-muted);padding:2rem 0;">Añade empleados en la sección Equipo para poder pagarles.</div>' : ''}
+            <div style="margin-top:1.5rem;">
+                <div style="font-weight:700;font-size:.9rem;margin-bottom:.5rem;display:flex;align-items:center;gap:.4rem;"><i class='bx bx-history'></i> Últimos pagos</div>
+                ${buildPaymentsHistory(8)}
+            </div>
+        </div>`;
+    };
 
     const renderAlertasSection = () => `
         <div style="padding:1rem;">
@@ -350,6 +583,15 @@ export function renderAdmin(container, app) {
                             <button class="btn btn-primary" id="btn-save-alerts">Guardar Alertas</button>
                         </div>
                     </div>
+
+                    <div class="widget" id="sec-backup">
+                        <h3>Copia de Seguridad</h3>
+                        <p style="font-size:.85rem;color:var(--color-text-muted);margin:.5rem 0 1rem;">Descarga o restaura todos los datos (empleados, pagos, ventas, configuración).</p>
+                        <div style="display:flex;flex-direction:column;gap:0.5rem;">
+                            <button class="btn btn-secondary" onclick="window.exportBackup()" style="width:100%;"><i class='bx bx-download'></i> Exportar copia</button>
+                            <button class="btn btn-secondary" onclick="window.triggerImport()" style="width:100%;"><i class='bx bx-upload'></i> Importar copia</button>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="dashboard-grid" style="margin-top:2rem;" id="sec-empleados">
@@ -390,6 +632,20 @@ export function renderAdmin(container, app) {
                                 </tbody>
                             </table>
                         </div>
+                    </div>
+                </div>
+
+                <div class="dashboard-grid" style="margin-top:2rem;" id="sec-pagos">
+                    <div class="widget" style="grid-column: 1 / -1;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 1rem;">
+                            <h3><i class='bx bx-euro'></i> Pagos a Empleados</h3>
+                            <span style="font-size:.9rem;color:var(--color-text-muted);">Total pagado: <strong style="color:var(--color-primary);">${formatMoney((globalState.payments || []).reduce((s, p) => s + (p.amount || 0), 0))}</strong></span>
+                        </div>
+                        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:.75rem;margin-bottom:1.5rem;">
+                            ${globalState.employees.map(emp => buildEmployeePayCard(emp)).join('')}
+                        </div>
+                        <div style="font-weight:700;font-size:.9rem;margin-bottom:.5rem;display:flex;align-items:center;gap:.4rem;"><i class='bx bx-history'></i> Últimos pagos</div>
+                        ${buildPaymentsHistory(12)}
                     </div>
                 </div>
             </div>
@@ -444,93 +700,8 @@ export function renderAdmin(container, app) {
         if (btnAddEmp) btnAddEmp.addEventListener('click', () => openEmployeeForm());
     };
 
-    // Shared event binder used by both mobile sections and desktop
-    const bindSectionEvents = () => {
-        if (document.getElementById('btn-open-shift')) {
-            document.getElementById('btn-open-shift').addEventListener('click', openShiftInline);
-        }
-        if (document.getElementById('btn-close-shift')) {
-            document.getElementById('btn-close-shift').addEventListener('click', closeShiftInline);
-        }
-        if (document.getElementById('btn-reset-shift')) {
-            document.getElementById('btn-reset-shift').addEventListener('click', resetShiftInline);
-        }
-
-        const numTablesEl = document.getElementById('input-num-tables');
-        if (numTablesEl) numTablesEl.addEventListener('change', (e) => {
-            globalState.updateConfig({ numTables: parseInt(e.target.value) });
-            render();
-        });
-
-        const btnEditor = document.getElementById('btn-table-editor');
-        if (btnEditor) btnEditor.addEventListener('click', renderTableEditor);
-        const btnTickets = document.getElementById('btn-tickets-archive');
-        if (btnTickets) btnTickets.addEventListener('click', renderTicketsArchive);
-        const btnHistory = document.getElementById('btn-shift-history');
-        if (btnHistory) btnHistory.addEventListener('click', renderShiftHistory);
-
-        const btnAssignZone = document.getElementById('btn-assign-zone');
-        if (btnAssignZone) {
-            btnAssignZone.addEventListener('click', () => {
-                const zone = document.getElementById('zone-select').value;
-                const checked = Array.from(document.querySelectorAll('.zone-table-check:checked')).map(c=>parseInt(c.value));
-                checked.forEach(id => globalState.updateTable(id, { zone }));
-                app.showToast(`Zona "${zone}" asignada a ${checked.length} mesas`);
-                render();
-            });
-        }
-
-        const btnSaveAlerts = document.getElementById('btn-save-alerts');
-        if (btnSaveAlerts) btnSaveAlerts.addEventListener('click', () => {
-            globalState.updateConfig({
-                alertWarning: parseInt(document.getElementById('input-alert-warn').value),
-                alertDanger: parseInt(document.getElementById('input-alert-danger').value),
-                barAlertWarning: parseInt(document.getElementById('input-alert-bwarn').value),
-                barAlertDanger: parseInt(document.getElementById('input-alert-bdanger').value)
-            });
-            app.showToast('Alertas guardadas');
-        });
-
-        const btnAddEmp = document.getElementById('btn-add-emp');
-        if (btnAddEmp) btnAddEmp.addEventListener('click', () => openEmployeeForm());
-        // ↑ These are the desktop-specific binds above. Shared binds come from bindSectionEvents
-    };
 
 
-    const calculateAverageWaitTime = () => {
-        const qC = deviceManager.getQueue('queue_cocina');
-        const qB = deviceManager.getQueue('queue_barra');
-        const all = [...qC, ...qB];
-        if (all.length === 0) return 0;
-        let total = 0;
-        all.forEach(o => total += (Date.now() - o.timestamp_entrada));
-        return Math.floor((total / all.length) / 60000);
-    };
-
-    const calculateBarraStats = () => {
-        const aB = deviceManager.getQueue('archive_barra');
-        const qB = deviceManager.getQueue('queue_barra');
-        let servidas = 0;
-        let pendientes = 0;
-        const counts = {};
-        
-        aB.forEach(o => o.items.forEach(i => {
-            servidas += i.qty;
-            counts[i.name] = (counts[i.name] || 0) + i.qty;
-        }));
-        qB.forEach(o => o.items.forEach(i => {
-            pendientes += i.qty;
-            counts[i.name] = (counts[i.name] || 0) + i.qty;
-        }));
-        
-        let top = 'Ninguna';
-        let max = 0;
-        for (const [name, qty] of Object.entries(counts)) {
-            if (qty > max) { max = qty; top = name; }
-        }
-        
-        return { servidas, pendientes, topVentas: top };
-    };
 
     window.editEmployee = (id) => {
         const emp = globalState.employees.find(e => e.id === id);
@@ -542,18 +713,30 @@ export function renderAdmin(container, app) {
         renderAdmin(container, app);
     };
 
+    // ── PAGOS A EMPLEADOS (handlers; helpers viven a nivel de módulo) ──────────
+    window.payEmployee = (id) => {
+        const emp = globalState.employees.find(e => e.id === id);
+        if (emp) openPaymentForm(emp, () => renderAdmin(container, app));
+    };
+
+    window.deletePayment = (id) => {
+        globalState.deletePayment(id);
+        renderAdmin(container, app);
+    };
+
     const openEmployeeForm = (emp = null) => {
         const isEdit = !!emp;
-        const eData = emp || { id: 'e_' + Date.now(), alias: '', pin: '', role: 'Camarero', active: true, isAdmin: false, color: '#8B0000' };
+        const eData = emp || { id: 'e_' + Date.now(), alias: '', pin: '', role: 'Camarero', active: true, isAdmin: false, color: '#8B0000', name: '', dni: '', phone: '', hireDate: '', rate: 0 };
 
         const html = `
             <div style="display:flex; flex-direction:column; gap:1rem;">
+                <div style="font-weight:700;font-size:.85rem;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:.05em;">Acceso al TPV</div>
                 <label>Alias (Nombre visible):</label>
-                <input type="text" id="emp-alias" value="${eData.alias}" style="padding:0.5rem;">
-                
+                <input type="text" id="emp-alias" value="${eData.alias || ''}" style="padding:0.5rem;">
+
                 <label>PIN de 4 dígitos:</label>
-                <input type="text" id="emp-pin" value="${eData.pin}" maxlength="4" style="padding:0.5rem;">
-                
+                <input type="text" id="emp-pin" value="${eData.pin || ''}" maxlength="4" style="padding:0.5rem;">
+
                 <label>Rol principal:</label>
                 <select id="emp-role" style="padding:0.5rem;">
                     <option value="Camarero" ${eData.role==='Camarero'?'selected':''}>Camarero</option>
@@ -562,11 +745,32 @@ export function renderAdmin(container, app) {
                 </select>
 
                 <label>Color representativo:</label>
-                <input type="color" id="emp-color" value="${eData.color}" style="width:100%; height:40px;">
+                <input type="color" id="emp-color" value="${eData.color || '#8B0000'}" style="width:100%; height:40px;">
 
                 <div style="display:flex; gap:1rem; margin-top:0.5rem;">
                     <label><input type="checkbox" id="emp-active" ${eData.active?'checked':''}> Activo</label>
                     <label><input type="checkbox" id="emp-admin" ${eData.isAdmin?'checked':''}> Permisos Administrador</label>
+                </div>
+
+                <div style="font-weight:700;font-size:.85rem;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:.05em;margin-top:.5rem;border-top:1px solid var(--color-border);padding-top:1rem;">Datos para pagos</div>
+                <label>Nombre completo:</label>
+                <input type="text" id="emp-name" value="${eData.name || ''}" placeholder="Nombre y apellidos" style="padding:0.5rem;">
+
+                <label>DNI / NIF:</label>
+                <input type="text" id="emp-dni" value="${eData.dni || ''}" placeholder="00000000X" style="padding:0.5rem;">
+
+                <label>Teléfono:</label>
+                <input type="tel" id="emp-phone" value="${eData.phone || ''}" placeholder="600 000 000" style="padding:0.5rem;">
+
+                <div style="display:flex; gap:1rem;">
+                    <div style="flex:1;">
+                        <label>Fecha de alta:</label>
+                        <input type="date" id="emp-hiredate" value="${eData.hireDate || ''}" style="padding:0.5rem;width:100%;">
+                    </div>
+                    <div style="flex:1;">
+                        <label>Tarifa (€/hora):</label>
+                        <input type="number" id="emp-rate" value="${eData.rate || ''}" min="0" step="0.01" placeholder="0.00" style="padding:0.5rem;width:100%;">
+                    </div>
                 </div>
             </div>
         `;
@@ -584,6 +788,11 @@ export function renderAdmin(container, app) {
             eData.color = document.getElementById('emp-color').value;
             eData.active = document.getElementById('emp-active').checked;
             eData.isAdmin = document.getElementById('emp-admin').checked;
+            eData.name = document.getElementById('emp-name').value.trim();
+            eData.dni = document.getElementById('emp-dni').value.trim();
+            eData.phone = document.getElementById('emp-phone').value.trim();
+            eData.hireDate = document.getElementById('emp-hiredate').value;
+            eData.rate = parseFloat(document.getElementById('emp-rate').value) || 0;
 
             if (isEdit) {
                 globalState.updateEmployee(eData.id, eData);
@@ -694,14 +903,42 @@ export function renderAdmin(container, app) {
 
 
     const resetShiftInline = () => {
-        if(confirm('⚠️ ¿Estás seguro de resetear el turno completamente? Esto borrará comandas activas sin generar informe.')) {
+        const existing = document.getElementById('shift-reset-modal');
+        if (existing) existing.remove();
+        const ov = document.createElement('div');
+        ov.id = 'shift-reset-modal';
+        ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px);padding:1rem;';
+        ov.innerHTML = `
+            <div style="background:var(--color-surface);border:1px solid var(--color-border);border-radius:20px;padding:1.5rem;width:min(380px,94vw);display:flex;flex-direction:column;gap:1rem;">
+                <div style="display:flex;align-items:center;gap:.75rem;">
+                    <div style="width:44px;height:44px;border-radius:50%;background:var(--color-warning,#f59e0b);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                        <i class='bx bx-error' style="font-size:1.5rem;color:#fff;"></i>
+                    </div>
+                    <div>
+                        <div style="font-weight:800;font-size:1rem;">Resetear Turno</div>
+                        <div style="font-size:.8rem;color:var(--color-text-muted);">Esta acción no se puede deshacer</div>
+                    </div>
+                </div>
+                <p style="font-size:.88rem;color:var(--color-text-muted);margin:0;">Esto borrará todas las comandas activas sin generar informe de cierre. ¿Continuar?</p>
+                <div style="display:flex;gap:.75rem;">
+                    <button id="btn-reset-cancel" class="btn btn-secondary" style="flex:1;">Cancelar</button>
+                    <button id="btn-reset-confirm" class="btn btn-primary" style="flex:1;background:var(--color-warning,#f59e0b);border-color:var(--color-warning,#f59e0b);">
+                        <i class='bx bx-reset'></i> Resetear
+                    </button>
+                </div>
+            </div>`;
+        document.body.appendChild(ov);
+        document.getElementById('btn-reset-cancel').addEventListener('click', () => ov.remove());
+        document.getElementById('btn-reset-confirm').addEventListener('click', () => {
+            ov.remove();
             globalState.logAction('Reset forzado de turno');
             tickets.clearTickets();
             globalState.resetShift();
             render();
             app.showToast('Turno reseteado');
-        }
+        });
     };
+
 
     const renderShiftSummaryHtml = () => {
         const allTickets = tickets.getAllTickets();

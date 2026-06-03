@@ -1,4 +1,4 @@
-const CACHE_NAME = 'zambrana-v2.5';
+const CACHE_NAME = 'zambrana-v3.0';
 const ASSETS = [
     './',
     './index.html',
@@ -6,6 +6,7 @@ const ASSETS = [
     './css/styles.css',
     './js/app.js',
     './js/auth.js',
+    './js/config.js',
     './js/data.js',
     './js/device.js',
     './js/state.js',
@@ -13,6 +14,10 @@ const ASSETS = [
     './js/tickets.js',
     './js/tour.js',
     './js/alergenos.js',
+    './js/carta.js',
+    './js/sync/provider.js',
+    './js/sync/local-provider.js',
+    './js/sync/supabase-provider.js',
     './js/ui/home.js',
     './js/ui/camarero.js',
     './js/ui/mobile_camarero.js',
@@ -50,8 +55,11 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-    // Only handle GET requests
+    // Solo gestionamos GET del mismo origen. Las llamadas a Supabase (otro origen)
+    // y los WebSocket de tiempo real pasan directos a la red, sin interferencia.
     if (event.request.method !== 'GET') return;
+    const url = new URL(event.request.url);
+    if (url.origin !== self.location.origin) return;
 
     event.respondWith(
         fetch(event.request).then((networkResponse) => {
@@ -63,8 +71,6 @@ self.addEventListener('fetch', (event) => {
                 cache.put(event.request, responseToCache);
             });
             return networkResponse;
-        }).catch(() => {
-            return caches.match(event.request);
-        })
+        }).catch(() => caches.match(event.request))
     );
 });

@@ -1,26 +1,78 @@
+import { config, resolveSyncMode } from './config.js';
+import { LocalProvider } from './sync/local-provider.js';
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Orquestador de almacenamiento (offline-first).
+//
+// - localStorage es la fuente de LECTURA inmediata: la UI es instantánea y funciona
+//   sin conexión.
+// - Cada escritura: 1) cachea en localStorage, 2) avisa a las otras pestañas del
+//   equipo (LocalProvider) y 3) la sube a la nube si está activa (SupabaseProvider).
+// - Los cambios entrantes (de otra pestaña o de otro dispositivo) pasan todos por
+//   handleIncoming(): refrescan la caché y disparan el mismo mensaje STATE_UPDATE
+//   que state.js ya escuchaba → así el resto de la app no cambia.
+//
+// La API pública (saveState, loadState, subscribe, notifyListeners, channel) se
+// mantiene idéntica para no tocar state.js ni la UI.
+// ──────────────────────────────────────────────────────────────────────────────
+
 export class StorageManager {
-    constructor(channelName = 'zambrana_channel') {
-        this.channel = (typeof BroadcastChannel !== 'undefined') ? new BroadcastChannel(channelName) : null;
+    constructor() {
         this.listeners = [];
 
-        // Listen for BroadcastChannel messages
-        if (this.channel) {
-            this.channel.onmessage = (event) => {
-                this.notifyListeners(event.data);
-            };
-        }
+        // Proveedor local: siempre activo (sincroniza pestañas del mismo equipo).
+        this.local = new LocalProvider();
+        // Se preserva `storage.channel` (state.js lo usa para el aviso NEW_ORDER).
+        this.channel = this.local.channel;
 
-        // Fallback for Safari / other contexts via localStorage events
-        window.addEventListener('storage', (event) => {
-            if (event.key === 'zambrana_state_update') {
-                try {
-                    const data = JSON.parse(event.newValue);
-                    this.notifyListeners(data);
-                } catch (e) {
-                    console.error('Error parsing storage event', e);
-                }
-            }
-        });
+        // Proveedor en la nube (se inicializa de forma asíncrona si está configurado).
+        this.cloud = null;
+
+        // Estado de sincronización: 'local' | 'connecting' | 'online' | 'offline'
+        this.syncStatus = 'local';
+        this.onSyncStatus = null;
+
+        // Recepción de cambios (mismo equipo) e inicialización.
+        this.local.init((data) => this.handleIncoming(data), null);
+
+        // Arranque de la nube (no bloquea; la app ya funciona en local).
+        this.initCloud();
+    }
+
+    async initCloud() {
+        if (resolveSyncMode() !== 'cloud') {
+            this.setSyncStatus('local');
+            return;
+        }
+        if (typeof window === 'undefined' || !window.supabase || !window.supabase.createClient) {
+            console.warn('[Zambrana] SDK de Supabase no disponible — funcionando en modo local.');
+            this.setSyncStatus('local');
+            return;
+        }
+        try {
+            // Normaliza la URL: el cliente necesita la URL BASE del proyecto, no el
+            // endpoint REST. Quita '/rest/v1', '/auth/v1' y barras finales por si se pegó de más.
+            const baseUrl = config.SUPABASE_URL
+                .trim()
+                .replace(/\/(rest|auth|realtime|storage)\/v1\/?$/i, '')
+                .replace(/\/+$/, '');
+            const client = window.supabase.createClient(baseUrl, config.SUPABASE_ANON_KEY);
+            const deviceId = localStorage.getItem('ztpv_current_device_id') || ('dev-' + Date.now());
+            const { SupabaseProvider } = await import('./sync/supabase-provider.js');
+            this.cloud = new SupabaseProvider(client, config.TENANT_ID, deviceId);
+            await this.cloud.init(
+                (data) => this.handleIncoming(data),
+                (status) => this.setSyncStatus(status)
+            );
+        } catch (e) {
+            console.error('[Zambrana] No se pudo iniciar la nube — modo local.', e);
+            this.setSyncStatus('local');
+        }
+    }
+
+    setSyncStatus(status) {
+        this.syncStatus = status;
+        if (this.onSyncStatus) this.onSyncStatus(status);
     }
 
     subscribe(callback) {
@@ -35,24 +87,42 @@ export class StorageManager {
         this.listeners.forEach(cb => cb(data));
     }
 
-    // Save to LocalStorage and broadcast update
-    saveState(key, state) {
-        const payload = JSON.stringify(state);
-        localStorage.setItem(`zambrana_${key}`, payload);
-        
-        // Broadcast
-        const message = { type: 'STATE_UPDATE', key, state };
-        if (this.channel) {
-            this.channel.postMessage(message);
+    // Punto único de entrada para cambios que vienen de FUERA (otra pestaña / nube).
+    handleIncoming(data) {
+        if (!data) return;
+        if (data.type === 'STATE_UPDATE' && data.key !== undefined) {
+            // Mantener la caché local fresca (imprescindible entre dispositivos).
+            try { localStorage.setItem(`zambrana_${data.key}`, JSON.stringify(data.state)); }
+            catch (e) { /* ignore */ }
         }
-        
-        // Trigger storage event for same-browser other tabs if channel fails
-        localStorage.setItem('zambrana_state_update', JSON.stringify({ ...message, timestamp: Date.now() }));
+        this.notifyListeners(data);
+    }
+
+    // Guarda y propaga un cambio LOCAL.
+    saveState(key, state) {
+        // 1. Caché inmediata (lectura offline-first).
+        localStorage.setItem(`zambrana_${key}`, JSON.stringify(state));
+        // 2. Otras pestañas del mismo equipo.
+        this.local.set(key, state);
+        // 3. Nube (si está activa).
+        if (this.cloud) this.cloud.set(key, state);
     }
 
     loadState(key) {
         const data = localStorage.getItem(`zambrana_${key}`);
         return data ? JSON.parse(data) : null;
+    }
+
+    // Devuelve todas las keys de estado guardadas (para copias de seguridad).
+    getAllKeys() {
+        const keys = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k && k.startsWith('zambrana_') && k !== 'zambrana_state_update') {
+                keys.push(k.slice('zambrana_'.length));
+            }
+        }
+        return keys;
     }
 }
 

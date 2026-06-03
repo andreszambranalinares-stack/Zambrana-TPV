@@ -2,7 +2,7 @@ import { globalState } from '../state.js';
 import { tickets } from '../tickets.js';
 import { storage } from '../storage.js';
 import { deviceManager } from '../device.js';
-import { renderAdmin } from './admin.js';
+import { renderAdmin, renderPayroll } from './admin.js';
 
 export function renderDesktop(container, app) {
     let activeSection = 'mesas'; // mesas | comandas | carta | informes | ajustes
@@ -16,7 +16,7 @@ export function renderDesktop(container, app) {
                 <img src="logo.png" alt="Zambrana TPV" style="height:34px;cursor:pointer;" id="btn-nav-home">
             </div>
             <div class="desktop-nav-links">
-                ${[['mesas',`<i class='bx bx-grid-alt'></i> Mesas`],['comandas',`<i class='bx bx-receipt'></i> Comandas`],['carta',`<i class='bx bx-package'></i> Productos`],['informes',`<i class='bx bx-bar-chart-alt-2'></i> Informes`],['ajustes',`<i class='bx bx-cog'></i> Ajustes`]].map(([k,l])=>`
+                ${[['mesas',`<i class='bx bx-grid-alt'></i> Mesas`],['comandas',`<i class='bx bx-receipt'></i> Comandas`],['carta',`<i class='bx bx-package'></i> Productos`],['personal',`<i class='bx bx-euro'></i> Personal`],['informes',`<i class='bx bx-bar-chart-alt-2'></i> Informes`],['ajustes',`<i class='bx bx-cog'></i> Ajustes`]].map(([k,l])=>`
                     <button class="desktop-nav-link ${activeSection===k?'active':''}" data-section="${k}">${l}</button>
                 `).join('')}
             </div>
@@ -547,6 +547,8 @@ export function renderDesktop(container, app) {
             main.innerHTML = renderComandasSection();
         } else if (activeSection === 'ajustes') {
             main.innerHTML = '<div style="flex:1;overflow-y:auto;padding:1.5rem;" id="admin-wrapper"></div>';
+        } else if (activeSection === 'personal') {
+            main.innerHTML = '<div style="flex:1;overflow-y:auto;padding:1.5rem;" id="personal-wrapper"></div>';
         } else if (activeSection === 'carta') {
             main.innerHTML = '<div style="flex:1;overflow-y:auto;padding:1.5rem;" id="carta-wrapper"></div>';
         } else if (activeSection === 'informes') {
@@ -564,6 +566,10 @@ export function renderDesktop(container, app) {
         if (activeSection === 'ajustes') {
             const w = document.getElementById('admin-wrapper');
             if (w) renderAdmin(w, app);
+        }
+        if (activeSection === 'personal') {
+            const w = document.getElementById('personal-wrapper');
+            if (w) renderPayroll(w, app);
         }
         if (activeSection === 'carta') {
             const w = document.getElementById('carta-wrapper');

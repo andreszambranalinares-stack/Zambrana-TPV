@@ -39,9 +39,6 @@ export function renderHome(container, app) {
                     <span>Barra</span>
                 </button>
             </div>
-            <button id="role-admin" title="Administración" style="display:${auth.isAdmin() || (app.currentUser && app.currentUser.isAdmin) ? 'none' : 'block'}; position:fixed; bottom:1rem; left:1rem; background:rgba(255,255,255,0.05); color:var(--color-text-muted); padding:0.8rem; border-radius:50%; border:1px solid var(--color-border); opacity:0.6; cursor:pointer; font-size:1.5rem; z-index:500;">
-                <i class="bx bx-cog"></i>
-            </button>
         </div>
     `;
     container.innerHTML = html;
@@ -120,19 +117,4 @@ export function renderHome(container, app) {
     document.getElementById('role-camarero').addEventListener('click', () => selectEmployeeAndNavigate('Camarero', 'camarero'));
     document.getElementById('role-cocinero').addEventListener('click', () => selectEmployeeAndNavigate('Cocinero', 'cocinero'));
     document.getElementById('role-barra').addEventListener('click', () => selectEmployeeAndNavigate('Barra', 'barra'));
-
-    document.getElementById('role-admin').addEventListener('click', () => {
-        if (auth.isAdmin() || (app.currentUser && app.currentUser.isAdmin)) {
-            app.navigate('admin');
-        } else {
-            auth.showLoginModal(() => {
-                app.navigate('admin');
-            });
-        }
-    });
-
-    const btnQuickAdmin = document.getElementById('btn-quick-admin');
-    if (btnQuickAdmin) {
-        btnQuickAdmin.addEventListener('click', () => app.navigate('admin'));
-    }
 }
