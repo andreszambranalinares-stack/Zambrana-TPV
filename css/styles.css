@@ -116,10 +116,17 @@ header.hidden ~ #app-container { min-height: 100vh; }
     box-shadow: var(--shadow-sm); border: 1px solid var(--color-border); position: relative;
     transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
-.role-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-floating); border-color: var(--color-primary-light); }
-.role-card .icon { font-size: 3.5rem; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1)); transition: transform 0.3s; }
+.role-card { overflow: hidden; }
+.role-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--role-accent, var(--color-primary)); opacity: .85; }
+.role-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-floating); border-color: var(--role-accent, var(--color-primary-light)); }
+.role-card .icon { font-size: 3.4rem; color: var(--role-accent, var(--color-primary-light)); filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3)); transition: transform 0.3s; }
 .role-card:hover .icon { transform: scale(1.1) rotate(-5deg); }
-.role-card span { font-size: 1.3rem; font-weight: 700; color: var(--color-text); }
+.role-card .role-title { font-size: 1.3rem; font-weight: 700; color: var(--color-text); }
+.role-card .role-sub { font-size: 0.82rem; font-weight: 500; color: var(--color-text-muted); margin-top: -0.4rem; }
+#role-camarero { --role-accent: #D61F2C; }
+#role-cocinero { --role-accent: #F5A623; }
+#role-barra    { --role-accent: #2ECC71; }
+.role-cards.disabled { opacity: 0.5; pointer-events: none; filter: grayscale(0.4); }
 .badge { position: absolute; top: -10px; right: -10px; background: var(--color-primary); color: white; border-radius: 20px; padding: 4px 12px; font-weight: 700; font-size: 0.9rem; box-shadow: 0 4px 10px rgba(153, 27, 27, 0.3); border: 2px solid var(--color-surface); }
 
 /* Waiter View: Tables Grid */
@@ -204,6 +211,17 @@ header.hidden ~ #app-container { min-height: 100vh; }
 .item-name { font-weight: 600; font-size: 0.92rem; margin-bottom: 0.4rem; color: var(--color-text); line-height: 1.25; padding-right: 1.4rem; }
 .item-price { color: var(--color-primary-light); font-weight: 800; font-size: 1.05rem; }
 
+/* Opciones de plato (modal "Añadir"): secciones y chips seleccionables */
+.opt-section { background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 0.85rem; margin-bottom: 1rem; }
+.opt-section h4 { font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-text-muted); margin-bottom: 0.6rem; font-weight: 800; display:flex; align-items:center; gap:0.4rem; }
+.chip-row { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.chip { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.45rem 0.85rem; border-radius: 20px; border: 2px solid var(--color-border); background: var(--color-surface); color: var(--color-text); font-size: 0.85rem; font-weight: 600; cursor: pointer; user-select: none; transition: all .12s ease; min-height: 40px; }
+.chip input { position: absolute; opacity: 0; pointer-events: none; }
+.chip:hover { border-color: var(--color-primary-light); }
+.chip:has(input:checked) { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+.chip.chip-keep:has(input:checked) { background: var(--color-free); border-color: var(--color-free); color: #08260f; }
+.opt-note { width: 100%; min-height: 64px; padding: 0.7rem; border-radius: var(--radius-md); resize: vertical; }
+
 /* Order Panel styling */
 .order-header { padding: 1rem; border-bottom: 1px solid var(--color-border); background: var(--color-surface); display:flex; flex-direction:column; gap:0.2rem; border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
 .order-header h2 { font-size: 1.2rem; color: var(--color-text); font-weight: 800; display:flex; align-items:center; justify-content:space-between;}
@@ -240,6 +258,17 @@ header.hidden ~ #app-container { min-height: 100vh; }
 .ticket-item { display: flex; align-items: flex-start; gap: 0.6rem; margin-bottom: 0.6rem; padding-bottom: 0.6rem; border-bottom: 1px dashed var(--color-border); font-size: 1rem; }
 .ticket-item-qty { font-weight: 800; min-width: 24px; color: var(--color-primary); }
 .ticket-notes { font-size: 0.85rem; color: #b45309; background: #fef3c7; padding: 0.3rem 0.6rem; border-radius: 6px; margin-top: 0.3rem; display: inline-block; font-weight: 500; }
+
+/* Estados de urgencia del tiempo de la comanda (cocina/barra) */
+.ticket-time.warning { background: var(--color-warning); color: #1a1a1a; }
+.ticket-time.danger { background: var(--color-danger); color: #fff; animation: ticket-pulse 1.4s ease-in-out infinite; }
+@keyframes ticket-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.5); }
+    50% { box-shadow: 0 0 0 6px rgba(231, 76, 60, 0); }
+}
+.ticket-card { border-width: 2px; transition: border-color .2s ease; }
+/* Botones de acción del ticket más grandes para pantalla táctil de cocina */
+.kanban-body .ticket-card .btn { min-height: 48px; font-weight: 700; }
 
 /* Desktop Breakpoint */
 @media (min-width: 768px) {

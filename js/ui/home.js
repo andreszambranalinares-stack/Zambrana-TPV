@@ -26,17 +26,20 @@ export function renderHome(container, app) {
             <div class="role-cards ${disabledClass}">
                 <button class="role-card" id="role-camarero" data-tour="role-camarero">
                     <span class="icon"><i class="bx bx-restaurant"></i></span>
-                    <span>Camarero</span>
+                    <span class="role-title">Camarero</span>
+                    <span class="role-sub">Sala y mesas</span>
                 </button>
                 <button class="role-card" id="role-cocinero" data-tour="role-cocinero">
                     ${kitchenPending > 0 ? `<div class="badge">${kitchenPending}</div>` : ''}
                     <span class="icon"><i class="bx bx-bowl-hot"></i></span>
-                    <span>Cocinero</span>
+                    <span class="role-title">Cocinero</span>
+                    <span class="role-sub">${kitchenPending > 0 ? kitchenPending + ' comanda' + (kitchenPending > 1 ? 's' : '') + ' en cola' : 'Comandas de cocina'}</span>
                 </button>
                 <button class="role-card" id="role-barra" data-tour="role-barra">
                     ${barPending > 0 ? `<div class="badge">${barPending}</div>` : ''}
                     <span class="icon"><i class="bx bx-drink"></i></span>
-                    <span>Barra</span>
+                    <span class="role-title">Barra</span>
+                    <span class="role-sub">${barPending > 0 ? barPending + ' pedido' + (barPending > 1 ? 's' : '') + ' en cola' : 'Bebidas y barra'}</span>
                 </button>
             </div>
         </div>

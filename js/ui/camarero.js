@@ -273,11 +273,11 @@ export function renderCamarero(container, app) {
         let ingsHtml = '';
         if (hasIngs) {
             ingsHtml = `
-                <div style="margin-bottom:1rem; border:1px solid var(--color-border); padding:0.5rem; border-radius:4px;">
-                    <h4 style="margin-bottom:0.5rem; font-size:0.9rem;">Ingredientes (desmarcar para quitar)</h4>
-                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; font-size:0.9rem;">
+                <div class="opt-section">
+                    <h4><i class='bx bx-leaf'></i> Ingredientes <span style="font-weight:600;text-transform:none;letter-spacing:0;">(desmarca para quitar)</span></h4>
+                    <div class="chip-row">
                         ${item.ingredients.filter(i => i.isEliminable).map(ing => `
-                            <label style="display:flex; align-items:center; gap:0.25rem;">
+                            <label class="chip chip-keep">
                                 <input type="checkbox" class="ing-checkbox" value="${ing.name}" checked> ${ing.name}
                             </label>
                         `).join('')}
@@ -288,32 +288,33 @@ export function renderCamarero(container, app) {
 
         let modHtml = '';
         if (hasMods) {
-            modHtml = `<div style="margin-bottom:1rem; border:1px solid var(--color-border); padding:0.5rem; border-radius:4px;">`;
             if (item.hasPuntoCarne) {
                 modHtml += `
-                    <h4 style="margin-bottom:0.5rem; font-size:0.9rem;">Punto de carne</h4>
-                    <div style="display:flex; gap:1rem; margin-bottom:0.5rem; font-size:0.9rem;">
-                        <label><input type="radio" name="punto" value="Poco hecho"> Poco hecho</label>
-                        <label><input type="radio" name="punto" value="Al punto" checked> Al punto</label>
-                        <label><input type="radio" name="punto" value="Muy hecho"> Muy hecho</label>
+                <div class="opt-section">
+                    <h4><i class='bx bx-dish'></i> Punto de carne</h4>
+                    <div class="chip-row">
+                        <label class="chip"><input type="radio" name="punto" value="Poco hecho"> Poco hecho</label>
+                        <label class="chip"><input type="radio" name="punto" value="Al punto" checked> Al punto</label>
+                        <label class="chip"><input type="radio" name="punto" value="Muy hecho"> Muy hecho</label>
                     </div>
-                `;
+                </div>`;
             }
             if (item.hasSinGluten || item.hasSinLactosa || item.hasSinSal) {
-                modHtml += `<h4 style="margin-bottom:0.5rem; font-size:0.9rem; margin-top:0.5rem;">Avisos</h4>`;
-                modHtml += `<div style="display:flex; gap:1rem; font-size:0.9rem;">`;
-                if (item.hasSinGluten) modHtml += `<label><input type="checkbox" class="mod-checkbox" value="Sin gluten"> Sin gluten</label>`;
-                if (item.hasSinLactosa) modHtml += `<label><input type="checkbox" class="mod-checkbox" value="Sin lactosa"> Sin lactosa</label>`;
-                if (item.hasSinSal) modHtml += `<label><input type="checkbox" class="mod-checkbox" value="Sin sal"> Sin sal</label>`;
-                modHtml += `</div>`;
+                modHtml += `<div class="opt-section"><h4><i class='bx bx-error-circle'></i> Avisos</h4><div class="chip-row">`;
+                if (item.hasSinGluten) modHtml += `<label class="chip"><input type="checkbox" class="mod-checkbox" value="Sin gluten"> Sin gluten</label>`;
+                if (item.hasSinLactosa) modHtml += `<label class="chip"><input type="checkbox" class="mod-checkbox" value="Sin lactosa"> Sin lactosa</label>`;
+                if (item.hasSinSal) modHtml += `<label class="chip"><input type="checkbox" class="mod-checkbox" value="Sin sal"> Sin sal</label>`;
+                modHtml += `</div></div>`;
             }
-            modHtml += `</div>`;
         }
-        
+
         const html = `
             ${ingsHtml}
             ${modHtml}
-            <textarea id="item-note" placeholder="Nota libre..." style="width:100%; height:60px; padding:0.5rem;"></textarea>
+            <div class="opt-section" style="margin-bottom:0;">
+                <h4><i class='bx bx-note'></i> Nota para cocina</h4>
+                <textarea id="item-note" class="opt-note" placeholder="Ej. poca sal, alergia leve, para llevar…"></textarea>
+            </div>
         `;
         
         const modalId = showModal(`Añadir ${item.name}`, html, `<button class="btn btn-primary" id="btn-confirm-item">Añadir al pedido</button>`);
