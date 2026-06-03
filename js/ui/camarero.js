@@ -23,17 +23,23 @@ export function renderCamarero(container, app) {
         const html = `
             <div class="waiter-view">
                 ${bannerHtml}
-                <div class="view-header-bar" style="padding:1rem; display:flex; justify-content:space-between; align-items:center;">
-                    <div class="tabs-container">
-                        ${zones.map(z=>`<button class="tab-pill ${tableFilter===z?'active':''}" data-zone="${z}">${z}</button>`).join('')}
+                <div class="view-header-bar" style="padding:1rem; display:flex; justify-content:space-between; align-items:center; gap:1rem;">
+                    <div style="display:flex; align-items:center; gap:0.75rem; min-width:0;">
+                        <button class="btn btn-secondary" id="btn-exit-waiter" style="flex-shrink:0; padding:0.5rem 0.9rem; display:flex; align-items:center; gap:0.4rem;"><i class='bx bx-arrow-back'></i> Salir</button>
+                        <div class="tabs-container">
+                            ${zones.map(z=>`<button class="tab-pill ${tableFilter===z?'active':''}" data-zone="${z}">${z}</button>`).join('')}
+                        </div>
                     </div>
-                    <div style="font-weight:700; color:var(--color-text-muted);">PLANO DE MESAS</div>
+                    <div style="font-weight:700; color:var(--color-text-muted); white-space:nowrap;">PLANO DE MESAS</div>
                 </div>
                 <div class="tables-spatial-grid" id="tables-container" style="display:grid; grid-template-columns:repeat(8, 1fr); grid-template-rows:repeat(6, 1fr); gap:12px; padding:1.5rem; background:var(--color-bg); flex:1; min-height:500px;"></div>
             </div>
         `;
         container.innerHTML = html;
         
+        const btnExit = document.getElementById('btn-exit-waiter');
+        if (btnExit) btnExit.addEventListener('click', () => app.navigate('home'));
+
         document.querySelectorAll('[data-zone]').forEach(btn => {
             btn.addEventListener('click', () => {
                 tableFilter = btn.dataset.zone;

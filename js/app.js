@@ -141,7 +141,12 @@ class App {
         this.currentView = view;
         this.container.innerHTML = '';
         
-        if (view === 'camarero' || view === 'admin') {
+        // La vista de camarero en MÓVIL trae su propia cabecera (con menú y atrás),
+        // así que ahí ocultamos la global. En ESCRITORIO la global debe seguir visible:
+        // su botón "atrás" es la única forma de salir de la sala y el layout ya reserva
+        // sus 60px (order-layout = 100vh - 60px). Admin tiene su propio layout en ambos.
+        const isMobile = window.innerWidth <= 800;
+        if (view === 'admin' || (view === 'camarero' && isMobile)) {
             this.header.classList.add('hidden');
         } else {
             this.header.classList.remove('hidden');
