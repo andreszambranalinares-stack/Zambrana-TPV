@@ -158,7 +158,7 @@ export function renderCamarero(container, app) {
                 <div class="order-section" id="order-panel">
                     <!-- Order details injected here -->
                 </div>
-                <button class="mobile-cart-toggle" id="btn-mobile-cart" class="hidden">🛒 Ver Pedido</button>
+                <button class="mobile-cart-toggle hidden" id="btn-mobile-cart"><i class='bx bx-cart'></i> <span id="cart-toggle-label">Ver Pedido</span></button>
             </div>
         `;
         container.innerHTML = html;
@@ -183,10 +183,10 @@ export function renderCamarero(container, app) {
         });
 
         const btnMobileCart = document.getElementById('btn-mobile-cart');
-        if (window.innerWidth <= 768) {
+        if (window.innerWidth < 1024) {
             btnMobileCart.classList.remove('hidden');
             btnMobileCart.addEventListener('click', () => {
-                document.getElementById('order-panel').classList.toggle('open');
+                document.getElementById('order-panel').classList.add('open');
             });
         }
 
@@ -234,23 +234,46 @@ export function renderCamarero(container, app) {
                 const hasAllergens = item.ingredients && item.ingredients.some(i => i.isAllergen);
                 const allergenIcon = hasAllergens ? `<span style="color:var(--color-danger); cursor:help;" title="Contiene alérgenos" onclick="event.stopPropagation(); alert('Contiene alérgenos. Ver pestaña alérgenos para más detalles.');">⚠️</span>` : '';
                 
+                const inDraft = draftOrder.items.filter(d => d.id === item.id).reduce((s, d) => s + d.qty, 0);
                 const itemCard = document.createElement('div');
                 itemCard.className = 'item-card';
+                itemCard.dataset.itemId = item.id;
                 itemCard.innerHTML = `
-                    <div>
-                        <div class="item-name">${item.name} ${allergenIcon}</div>
-                    </div>
-                    <div class="item-price">
-                        ${item.price.toFixed(2)} €
+                    ${inDraft > 0 ? `<span class="item-qty-badge" data-badge>${inDraft}</span>` : ''}
+                    <div class="item-name">${item.name} ${allergenIcon}</div>
+                    <div class="item-card-bottom">
+                        <span class="item-price">${item.price.toFixed(2)} €</span>
+                        <span class="item-add"><i class='bx bx-plus'></i></span>
                     </div>
                 `;
-                
+
                 itemCard.addEventListener('click', (e) => {
                     addItemToDraft(item);
                 });
                 itemsGrid.appendChild(itemCard);
             });
             mContainer.appendChild(itemsGrid);
+        });
+    };
+
+    // Actualiza los contadores de cantidad sobre las tarjetas del menú sin
+    // re-renderizar la lista (mantiene la posición de scroll).
+    const refreshMenuBadges = () => {
+        document.querySelectorAll('.item-card[data-item-id]').forEach(card => {
+            const id = card.dataset.itemId;
+            const qty = draftOrder.items.filter(d => d.id === id).reduce((s, d) => s + d.qty, 0);
+            let badge = card.querySelector('[data-badge]');
+            if (qty > 0) {
+                if (!badge) {
+                    badge = document.createElement('span');
+                    badge.className = 'item-qty-badge';
+                    badge.setAttribute('data-badge', '');
+                    card.appendChild(badge);
+                }
+                badge.textContent = qty;
+            } else if (badge) {
+                badge.remove();
+            }
         });
     };
 
@@ -432,7 +455,11 @@ export function renderCamarero(container, app) {
         let draftHtml = Object.keys(draftByCourse).map(course => renderDraftGroup(draftByCourse[course], course)).join('');
 
         if (draftOrder.items.length === 0) {
-            draftHtml = `<div style="text-align:center; color:var(--color-text-muted); margin-top:2rem;">Selecciona productos para el pedido.</div>`;
+            draftHtml = `<div style="text-align:center; color:var(--color-text-muted); margin-top:3rem; display:flex; flex-direction:column; align-items:center; gap:0.75rem;">
+                <i class='bx bx-food-menu' style="font-size:2.6rem; opacity:.5;"></i>
+                <div style="font-weight:600;">Toca un plato para añadirlo</div>
+                <div style="font-size:0.82rem; opacity:.8;">Se irá montando el pedido aquí</div>
+            </div>`;
         }
 
         const total = draftOrder.items.reduce((sum, item) => sum + (item.price * item.qty), 0);
@@ -442,6 +469,7 @@ export function renderCamarero(container, app) {
 
         panel.innerHTML = `
             <div class="order-header">
+                <button class="sheet-close" id="btn-sheet-close" aria-label="Cerrar pedido"><i class='bx bx-chevron-down'></i></button>
                 <h2>Mesa ${currentTable.id} ${isAdditional ? '<span style="color:var(--color-warning);font-size:1rem;">(Añadir +)</span>' : ''}</h2>
                 <div style="font-size:0.9rem; color:var(--color-text-muted);">Comensales: ${currentTable.guests} ${currentTable.name ? `| ${currentTable.name}` : ''}</div>
                 ${hasAllergensInTable ? `<div style="margin-top:0.5rem; background:var(--color-danger); color:white; padding:0.25rem 0.5rem; border-radius:4px; font-size:0.8rem; text-align:center;">⚠️ ALÉRGENOS EN MESA</div>` : ''}
@@ -450,7 +478,7 @@ export function renderCamarero(container, app) {
             <div class="order-items">
                 ${draftHtml}
             </div>
-            <div class="order-footer" style="background:#ffffff; border-top:1px solid var(--color-border); padding:1rem; box-shadow:0 -4px 10px rgba(0,0,0,0.02);">
+            <div class="order-footer">
                 <div class="order-total" style="font-size:1rem; margin-bottom:0.3rem; display:flex; justify-content:space-between; font-weight:600;">
                     <span>Subtotal nuevo:</span>
                     <span style="color:var(--color-primary);">${total.toFixed(2)} €</span>
@@ -631,6 +659,20 @@ export function renderCamarero(container, app) {
                     });
                 });
             });
+        }
+
+        refreshMenuBadges();
+
+        // Hoja deslizante (tablet/móvil): botón de cerrar y contador en el botón flotante.
+        const btnSheetClose = document.getElementById('btn-sheet-close');
+        if (btnSheetClose) btnSheetClose.addEventListener('click', () => panel.classList.remove('open'));
+
+        const cartLabel = document.getElementById('cart-toggle-label');
+        if (cartLabel) {
+            const draftCount = draftOrder.items.reduce((s, i) => s + i.qty, 0);
+            cartLabel.textContent = draftCount > 0
+                ? `Ver Pedido · ${draftCount} · ${total.toFixed(2)} €`
+                : 'Ver Pedido';
         }
     };
 

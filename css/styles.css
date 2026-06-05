@@ -198,18 +198,16 @@ header.hidden ~ #app-container { min-height: 100vh; }
 .item-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--color-primary); opacity: 0; transition: opacity .12s ease; }
 .item-card:hover { border-color: var(--color-primary-light); transform: translateY(-2px); box-shadow: var(--shadow-md); background: var(--color-surface-hover); }
 .item-card:hover::before { opacity: 1; }
-.item-card:active { transform: translateY(0) scale(.97); }
-/* Distintivo "+" que aparece al pasar por encima: deja claro que se añade al tocar */
-.item-card::after {
-    content: '+'; position: absolute; top: 7px; right: 8px;
-    width: 22px; height: 22px; border-radius: 50%;
-    background: var(--color-primary); color: #fff;
-    font-size: 1.05rem; font-weight: 800; line-height: 22px; text-align: center;
-    opacity: 0; transform: scale(.5); transition: opacity .15s ease, transform .15s ease;
-}
-.item-card:hover::after { opacity: 1; transform: scale(1); }
-.item-name { font-weight: 600; font-size: 0.92rem; margin-bottom: 0.4rem; color: var(--color-text); line-height: 1.25; padding-right: 1.4rem; }
+.item-card:active { transform: scale(.96); border-color: var(--color-primary); background: var(--color-surface-hover); }
+.item-name { font-weight: 600; font-size: 0.95rem; margin-bottom: 0.5rem; color: var(--color-text); line-height: 1.25; }
+.item-card-bottom { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-top: auto; }
 .item-price { color: var(--color-primary-light); font-weight: 800; font-size: 1.05rem; }
+/* Botón "+" siempre visible: clave para que sea táctil (sin depender del hover) */
+.item-add { width: 34px; height: 34px; flex-shrink: 0; border-radius: 50%; background: var(--color-primary); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 1.35rem; box-shadow: 0 2px 6px rgba(214,31,44,.4); transition: transform .1s ease; }
+.item-card:hover .item-add { transform: scale(1.1); }
+.item-card:active .item-add { transform: scale(.9); }
+/* Indicador de cantidad ya añadida de ese plato */
+.item-qty-badge { position: absolute; top: 6px; right: 8px; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 11px; background: var(--color-free); color: #08260f; font-size: 0.78rem; font-weight: 800; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-sm); }
 
 /* Opciones de plato (modal "Añadir"): secciones y chips seleccionables */
 .opt-section { background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 0.85rem; margin-bottom: 1rem; }
@@ -223,7 +221,13 @@ header.hidden ~ #app-container { min-height: 100vh; }
 .opt-note { width: 100%; min-height: 64px; padding: 0.7rem; border-radius: var(--radius-md); resize: vertical; }
 
 /* Order Panel styling */
-.order-header { padding: 1rem; border-bottom: 1px solid var(--color-border); background: var(--color-surface); display:flex; flex-direction:column; gap:0.2rem; border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
+.order-header { padding: 1rem; border-bottom: 1px solid var(--color-border); background: var(--color-surface); display:flex; flex-direction:column; gap:0.2rem; border-radius: var(--radius-lg) var(--radius-lg) 0 0; position: relative; }
+/* Botón para cerrar la hoja del pedido — solo en tablet/móvil (panel deslizante) */
+.sheet-close { display: none; }
+@media (max-width: 1023px) {
+    .sheet-close { display: flex; align-items: center; justify-content: center; position: absolute; top: 10px; right: 10px; width: 42px; height: 42px; border-radius: 50%; background: var(--color-surface-hover); color: var(--color-text); font-size: 1.7rem; }
+    .order-header h2 { padding-right: 3rem; }
+}
 .order-header h2 { font-size: 1.2rem; color: var(--color-text); font-weight: 800; display:flex; align-items:center; justify-content:space-between;}
 .order-items { flex: 1; overflow-y: auto; padding: 1rem; background: var(--color-bg); }
 .order-group-title { font-size: 0.75rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; color: var(--color-primary); border-bottom: 2px solid rgba(153, 27, 27, 0.1); margin: 1rem 0 0.5rem; padding-bottom: 0.2rem; }
@@ -285,12 +289,6 @@ header.hidden ~ #app-container { min-height: 100vh; }
     /* Order Layout */
     .order-layout { flex-direction: row; margin: -1.5rem; }
     .menu-section { padding: 1.5rem; flex: 1; min-width: 0; }
-    .order-section { 
-        position: relative; height: auto; transform: none; 
-        width: 500px; min-width: 500px; max-width: 500px; border-radius: 0; box-shadow: -10px 0 30px rgba(0,0,0,0.08); 
-        border-left: 1px solid var(--color-border); flex-shrink: 0;
-    }
-    .mobile-cart-toggle { display: none; }
     .action-buttons { grid-template-columns: 1fr 1fr; }
 
     /* Desktop category tabs — más prominentes */
@@ -327,6 +325,19 @@ header.hidden ~ #app-container { min-height: 100vh; }
     .cook-kanban { flex-direction: row; height: calc(100vh - 140px); justify-content: center; align-items: stretch; gap: 2rem; }
     .kanban-col { min-width: 350px; max-width: 450px; flex: 1; }
     .kanban-body { overflow-y: auto; }
+}
+
+/* Solo en pantallas anchas/horizontales el pedido es panel lateral fijo.
+   En tablets en vertical (≈768–1023px) se mantiene como hoja deslizante,
+   dejando el menú a pantalla completa y el botón flotante "Ver Pedido". */
+@media (min-width: 1024px) {
+    .order-section {
+        position: relative; height: auto; transform: none;
+        width: 440px; min-width: 440px; max-width: 440px; border-radius: 0;
+        box-shadow: -10px 0 30px rgba(0,0,0,0.25);
+        border-left: 1px solid var(--color-border); flex-shrink: 0;
+    }
+    .mobile-cart-toggle { display: none; }
 }
 
 /* Modals & Popups */
