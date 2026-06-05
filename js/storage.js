@@ -75,6 +75,25 @@ export class StorageManager {
         return this.cloud ? this.cloud.client : null;
     }
 
+    // Número de factura para un cobro. Online: contador atómico en la nube (secuencia
+    // legal, sin colisiones entre dispositivos). Offline / local: secuencia provisional
+    // por dispositivo (marcada como tal).
+    async getInvoiceNumber() {
+        if (this.cloud && this.syncStatus === 'online') {
+            try {
+                const seq = await this.cloud.nextCounter('invoice');
+                return { seq, provisional: false };
+            } catch (e) {
+                console.warn('[Zambrana] nextCounter falló, número provisional local.', e);
+            }
+        }
+        const k = 'zambrana_invoice_local';
+        const n = (parseInt(localStorage.getItem(k) || '0', 10) || 0) + 1;
+        localStorage.setItem(k, String(n));
+        const dev = (localStorage.getItem('ztpv_current_device_id') || 'L').slice(-4);
+        return { seq: n, provisional: true, deviceTag: dev };
+    }
+
     setSyncStatus(status) {
         this.syncStatus = status;
         if (this.onSyncStatus) this.onSyncStatus(status);

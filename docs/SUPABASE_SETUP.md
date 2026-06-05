@@ -130,8 +130,58 @@ En **Admin → Cuenta segura (datos personales)** introduce el email y contrase�
 Mientras la sesión segura esté activa, los importes de pagos se sincronizan; sin ella la app
 funciona igual, pero los importes de pagos no salen de este dispositivo.
 
-> Pendiente (siguiente iteración): mover DNI/teléfono/tarifa del empleado a una clave protegida
-> aparte, para cerrarlos igual que `payments` sin afectar al login rápido de los camareros.
+### 5.4 Blindar también el DNI/teléfono del empleado (clave `employees_private`)
+Los datos personales del empleado (DNI, teléfono, tarifa) viajan ahora en una clave aparte
+`employees_private`, que se cierra igual que los pagos. Añade su regla RLS:
+
+```sql
+create policy "employees_private_admin_only" on app_state
+  for all
+  using (key = 'employees_private' and auth.role() = 'authenticated')
+  with check (key = 'employees_private' and auth.role() = 'authenticated');
+```
+
+> Y ajusta la regla "operational_anon" para excluir también esta clave (si la creaste con el
+> Paso 5.2, sustitúyela):
+> ```sql
+> drop policy if exists "operational_anon" on app_state;
+> create policy "operational_anon" on app_state for all
+>   using (key not in ('payments','employees_private'))
+>   with check (key not in ('payments','employees_private'));
+> ```
+
+---
+
+## Paso 6 — Numeración de facturas (contador atómico)
+
+Para que el número de **factura simplificada** sea correlativo y **no se repita entre
+dispositivos**, se usa un contador atómico en la base de datos. Ejecuta este SQL una vez:
+
+```sql
+create table if not exists counters (
+  tenant_id text not null,
+  name      text not null,
+  value     bigint not null default 0,
+  primary key (tenant_id, name)
+);
+alter table counters enable row level security;
+create policy "counters_all" on counters for all using (true) with check (true);
+
+-- Incrementa y devuelve el siguiente valor de forma atómica.
+create or replace function next_counter(p_tenant text, p_name text)
+returns bigint language plpgsql as $$
+declare v bigint;
+begin
+  insert into counters(tenant_id, name, value) values (p_tenant, p_name, 1)
+  on conflict (tenant_id, name) do update set value = counters.value + 1
+  returning value into v;
+  return v;
+end $$;
+```
+
+> **Offline:** si un dispositivo cobra sin conexión, la app emite un número **provisional**
+> (`PROV-xxxx-n`) marcado como tal. La secuencia legal correlativa se garantiza cobrando online
+> (lo normal, en el PC de barra). Al recuperar conexión, los nuevos cobros vuelven a numerar bien.
 
 ---
 

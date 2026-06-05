@@ -61,6 +61,8 @@ class App {
             this.applyTheme(globalState.config.theme);
         });
         
+        this.setupErrorHandling();
+
         deviceManager.init();
         initTour(this);
 
@@ -97,6 +99,38 @@ class App {
 
         // Render initial view
         this.navigate('home');
+    }
+
+    // Red de seguridad: registra errores no controlados (acotado a 50) y avisa con un
+    // toast discreto sin tumbar la app. Útil para diagnosticar incidencias en barra.
+    setupErrorHandling() {
+        const logError = (kind, msg) => {
+            try {
+                const k = 'zambrana_errlog';
+                const arr = JSON.parse(localStorage.getItem(k) || '[]');
+                arr.push({ t: Date.now(), kind, msg: String(msg == null ? '' : msg).slice(0, 300) });
+                while (arr.length > 50) arr.shift();
+                localStorage.setItem(k, JSON.stringify(arr));
+            } catch (e) { /* nunca romper por el propio logger */ }
+        };
+
+        let lastToast = 0;
+        const notify = () => {
+            const now = Date.now();
+            if (now - lastToast > 8000) { // evita avalancha de toasts
+                lastToast = now;
+                this.showToast('⚠️ Se produjo un error; la app sigue funcionando.');
+            }
+        };
+
+        window.addEventListener('error', (e) => {
+            logError('error', (e && (e.message || (e.error && e.error.message))) || 'error');
+            notify();
+        });
+        window.addEventListener('unhandledrejection', (e) => {
+            // Las promesas rechazadas (a menudo reintentos de red) solo se registran.
+            logError('promise', e && e.reason && (e.reason.message || e.reason));
+        });
     }
 
     setupSyncIndicator() {

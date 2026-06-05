@@ -4,6 +4,7 @@ import { storage } from '../storage.js';
 import { showModal, closeModal } from './common.js';
 import { auth } from '../auth.js';
 import { deviceManager } from '../device.js';
+import { buildShiftReport, reportToCSV } from '../reports.js';
 
 // ── PAGOS A EMPLEADOS — helpers compartidos (módulo) ──────────────────────────
 const PAYMENT_TYPES = ['Nómina', 'Adelanto', 'Propina', 'Hora extra', 'Otro'];
@@ -268,11 +269,73 @@ function editBusinessData() {
         globalState.updateBusiness(collect()); // guarda para que el preview refleje lo escrito
         const demoTable = { id: 0 };
         const demoOrders = [{ waiterName: 'Demostración', items: [
-            { name: 'Plato de ejemplo', qty: 1, price: 12.5 },
-            { name: 'Bebida', qty: 2, price: 2.5 }
+            { name: 'Plato de ejemplo', qty: 1, price: 12.5, ivaRate: 10 },
+            { name: 'Caña de cerveza', qty: 2, price: 2.5, ivaRate: 21 }
         ] }];
-        tickets.printCobro(demoTable, demoOrders, 17.5, 'efectivo');
+        tickets.printCobro(demoTable, demoOrders, 17.5, 'efectivo', { preview: true });
     });
+}
+
+// ── Informes de caja (X en vivo / Z al cerrar) ───────────────────────────────
+function currentShiftReport() {
+    return buildShiftReport({
+        tickets: tickets.getAllTickets(),
+        payments: globalState.payments,
+        shift: globalState.shift
+    });
+}
+
+// Render del informe (HTML para pantalla y para imprimir).
+function reportHtml(report, title = 'INFORME DE CAJA') {
+    const m = formatMoney;
+    const row = (a, b) => `<div style="display:flex;justify-content:space-between;gap:1rem;padding:2px 0;"><span>${a}</span><span style="font-weight:600;">${b}</span></div>`;
+    const section = (t) => `<div style="font-weight:800;font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--color-text-muted);margin:.75rem 0 .35rem;border-bottom:1px solid var(--color-border);padding-bottom:2px;">${t}</div>`;
+    const methodLabels = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', dividida: 'Dividido/Mixto', otro: 'Otro' };
+
+    return `
+        <div style="text-align:left;font-size:.9rem;">
+            <div style="font-weight:800;font-size:1rem;margin-bottom:.25rem;">${title}</div>
+            <div style="font-size:.78rem;color:var(--color-text-muted);">${report.shiftStart ? 'Apertura: ' + new Date(report.shiftStart).toLocaleString('es-ES') + '<br>' : ''}Generado: ${new Date(report.generatedAt).toLocaleString('es-ES')}</div>
+            ${section('Resumen')}
+            ${row('Ventas totales', `<strong style="color:var(--color-primary-light);">${m(report.totalSales)}</strong>`)}
+            ${row('Tickets', report.count)}
+            ${row('Ticket medio', m(report.avg))}
+            ${section('Por método de pago')}
+            ${Object.keys(report.byMethod).length ? Object.entries(report.byMethod).map(([k, v]) => row(methodLabels[k] || k, m(v))).join('') : '<div style="color:var(--color-text-muted);font-size:.82rem;">Sin cobros</div>'}
+            ${section('IVA')}
+            ${report.iva.length ? report.iva.map(r => row(`Base ${r.rate}% + cuota`, `${m(r.base)} + ${m(r.cuota)}`)).join('') : '<div style="color:var(--color-text-muted);font-size:.82rem;">—</div>'}
+            ${section('Por categoría')}
+            ${report.categories.slice(0, 12).map(c => row(`${c.category} (${c.qty})`, m(c.total))).join('') || '—'}
+            ${section('Top productos')}
+            ${report.topProducts.slice(0, 10).map(p => row(`${p.name} (${p.qty})`, m(p.total))).join('') || '—'}
+            ${section('Por camarero')}
+            ${report.waiters.map(w => row(`${w.waiter} (${w.count})`, m(w.total))).join('') || '—'}
+        </div>`;
+}
+
+function printReport(report, kind = 'X') {
+    const html = `<div id="print-area"><div class="print-header" style="text-align:center;">================================<br>${kind === 'Z' ? 'CIERRE DE CAJA (Z)' : 'INFORME (X)'}<br>================================</div>${reportHtml(report, kind === 'Z' ? 'CIERRE DE CAJA' : 'INFORME X')}</div>`;
+    tickets.doPrint(html);
+}
+
+function exportReportCSV(report, label = 'informe') {
+    const csv = reportToCSV(report);
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `zambrana-${label}-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// Informe X en vivo (no cierra el turno).
+function showXReport() {
+    const report = currentShiftReport();
+    const footer = `<button class="btn btn-secondary" id="btn-x-print"><i class='bx bx-printer'></i> Imprimir</button><button class="btn btn-secondary" id="btn-x-csv"><i class='bx bx-download'></i> CSV</button>`;
+    const modalId = showModal('Informe de caja (X)', reportHtml(report, 'INFORME X'), footer);
+    document.getElementById('btn-x-print').addEventListener('click', () => printReport(report, 'X'));
+    document.getElementById('btn-x-csv').addEventListener('click', () => exportReportCSV(report, 'informe-x'));
 }
 
 window.exportBackup = exportBackup;
@@ -280,6 +343,15 @@ window.triggerImport = triggerImport;
 window.changeAdminPassword = changeAdminPassword;
 window.manageSecureAccount = manageSecureAccount;
 window.editBusinessData = editBusinessData;
+window.showXReport = showXReport;
+window.printShiftHistory = (idx) => {
+    const h = (storage.loadState('shiftHistory') || [])[idx];
+    if (h && h.report) printReport(h.report, 'Z');
+};
+window.exportShiftHistoryCSV = (idx) => {
+    const h = (storage.loadState('shiftHistory') || [])[idx];
+    if (h && h.report) exportReportCSV(h.report, 'cierre-' + new Date(h.date).toISOString().slice(0, 10));
+};
 
 // ── Pantalla dedicada de Personal / Pagos (usada por el panel de escritorio) ──
 export function renderPayroll(container, app) {
@@ -501,6 +573,7 @@ export function renderAdmin(container, app) {
                 <button class="btn btn-secondary" id="btn-shift-history" style="width:100%;"><i class='bx bx-history'></i> Historial de Turnos</button>
                 <button class="btn btn-secondary" onclick="window.exportBackup()" style="width:100%;"><i class='bx bx-download'></i> Exportar copia de seguridad</button>
                 <button class="btn btn-secondary" onclick="window.triggerImport()" style="width:100%;"><i class='bx bx-upload'></i> Importar copia</button>
+                <button class="btn btn-secondary" onclick="window.showXReport()" style="width:100%;"><i class='bx bx-bar-chart-alt-2'></i> Informe de caja (X)</button>
                 <button class="btn btn-secondary" onclick="window.editBusinessData()" style="width:100%;"><i class='bx bx-receipt'></i> Datos del negocio (ticket)</button>
                 <button class="btn btn-secondary" onclick="window.changeAdminPassword()" style="width:100%;"><i class='bx bx-lock-alt'></i> Cambiar contraseña admin</button>
                 <button class="btn btn-secondary" onclick="window.manageSecureAccount()" style="width:100%;"><i class='bx bx-shield-quarter'></i> Cuenta segura (datos personales)</button>
@@ -723,6 +796,7 @@ export function renderAdmin(container, app) {
                         <div style="display:flex;flex-direction:column;gap:0.5rem;">
                             <button class="btn btn-secondary" onclick="window.exportBackup()" style="width:100%;"><i class='bx bx-download'></i> Exportar copia</button>
                             <button class="btn btn-secondary" onclick="window.triggerImport()" style="width:100%;"><i class='bx bx-upload'></i> Importar copia</button>
+                            <button class="btn btn-secondary" onclick="window.showXReport()" style="width:100%;"><i class='bx bx-bar-chart-alt-2'></i> Informe de caja (X)</button>
                             <button class="btn btn-secondary" onclick="window.editBusinessData()" style="width:100%;"><i class='bx bx-receipt'></i> Datos del negocio (ticket)</button>
                             <button class="btn btn-secondary" onclick="window.changeAdminPassword()" style="width:100%;"><i class='bx bx-lock-alt'></i> Cambiar contraseña admin</button>
                             <button class="btn btn-secondary" onclick="window.manageSecureAccount()" style="width:100%;"><i class='bx bx-shield-quarter'></i> Cuenta segura</button>
@@ -1000,12 +1074,15 @@ export function renderAdmin(container, app) {
         globalState.logAction('Cierre de turno');
         globalState.shift.isOpen = false;
 
-        const summaryHtml = renderShiftSummaryHtml();
+        // Informe Z estructurado (antes de limpiar) + archivado en el histórico.
+        const report = currentShiftReport();
+        const summaryHtml = reportHtml(report, 'CIERRE DE CAJA (Z)');
         const history = storage.loadState('shiftHistory') || [];
-        history.unshift({ date: Date.now(), html: summaryHtml });
-        if (history.length > 7) history.pop();
+        history.unshift({ date: Date.now(), report, html: summaryHtml });
+        if (history.length > 30) history.pop();
         storage.saveState('shiftHistory', history);
 
+        // Archivado: vaciar tickets del turno y comandas (evita crecimiento sin fin).
         tickets.clearTickets();
         globalState.resetShift();
 
@@ -1030,12 +1107,18 @@ export function renderAdmin(container, app) {
                 <div style="background:var(--color-bg);border-radius:12px;padding:1rem;">
                     ${summaryHtml}
                 </div>
+                <div style="display:flex;gap:.5rem;">
+                    <button id="btn-z-print" class="btn btn-secondary" style="flex:1;"><i class='bx bx-printer'></i> Imprimir Z</button>
+                    <button id="btn-z-csv" class="btn btn-secondary" style="flex:1;"><i class='bx bx-download'></i> CSV</button>
+                </div>
                 <button id="btn-shift-close-ok" class="btn btn-primary" style="width:100%;">
                     <i class='bx bx-home'></i> Volver a Inicio
                 </button>
             </div>`;
         document.body.appendChild(ov);
 
+        document.getElementById('btn-z-print').addEventListener('click', () => printReport(report, 'Z'));
+        document.getElementById('btn-z-csv').addEventListener('click', () => exportReportCSV(report, 'cierre-z'));
         document.getElementById('btn-shift-close-ok').addEventListener('click', () => {
             ov.remove();
             app.navigate('home');
@@ -1404,10 +1487,14 @@ export function renderAdmin(container, app) {
                 <button class="btn btn-secondary" onclick="window.app.navigate('admin')" style="margin-bottom:1rem;">← Volver</button>
                 <h2>Historial de Turnos</h2>
                 <div style="display:flex; flex-direction:column; gap:1rem; margin-top:1rem;">
-                    ${history.map(h => `
+                    ${history.map((h, i) => `
                         <div style="border:1px solid var(--color-border); border-radius:4px; padding:1rem; background:var(--color-surface);">
-                            <h4 style="margin-bottom:0.5rem; color:var(--color-primary);">${new Date(h.date).toLocaleDateString()}</h4>
+                            <h4 style="margin-bottom:0.5rem; color:var(--color-primary);">${new Date(h.date).toLocaleString('es-ES')}</h4>
                             ${h.html}
+                            ${h.report ? `<div style="display:flex;gap:.5rem;margin-top:.75rem;">
+                                <button class="btn btn-secondary" style="padding:.4rem .7rem;font-size:.85rem;" onclick="window.printShiftHistory(${i})"><i class='bx bx-printer'></i> Imprimir Z</button>
+                                <button class="btn btn-secondary" style="padding:.4rem .7rem;font-size:.85rem;" onclick="window.exportShiftHistoryCSV(${i})"><i class='bx bx-download'></i> CSV</button>
+                            </div>` : ''}
                         </div>
                     `).join('')}
                     ${history.length === 0 ? '<p>No hay historial de turnos.</p>' : ''}

@@ -1,0 +1,10 @@
+{
+  "name": "zambrana-tpv",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "TPV web/PWA para restaurante (Zambrana).",
+  "scripts": {
+    "test": "node --test"
+  }
+}

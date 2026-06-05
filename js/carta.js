@@ -1,5 +1,6 @@
 import { globalState } from './state.js';
 import { getCategoryDestination } from './data.js';
+import { defaultIvaForItem, IVA_RATES } from './fiscal.js';
 
 export function renderManageMenu(container, app) {
     let currentCategoryFilter = 'Todas';
@@ -63,6 +64,7 @@ export function renderManageMenu(container, app) {
                                     <td style="padding:0.5rem;"><strong>${p.name}</strong></td>
                                     <td style="padding:0.5rem;">
                                         <span style="font-size:0.85rem; background:var(--color-bg); padding:0.2rem 0.4rem; border-radius:4px;">${p.category}</span>
+                                        <span style="font-size:0.72rem; color:var(--color-text-muted); margin-left:0.3rem;">IVA ${Number.isFinite(Number(p.ivaRate)) ? Number(p.ivaRate) : 10}%</span>
                                         ${p.subcourse ? `<br><span style="font-size:0.75rem; color:var(--color-text-muted);">${p.subcourse}</span>` : ''}
                                     </td>
                                     <td style="padding:0.5rem;">
@@ -179,8 +181,17 @@ export function renderManageMenu(container, app) {
                             <input type="text" id="fp-name" value="${p.name}" style="width:100%; padding:0.5rem;">
                         </div>
                         <div>
-                            <label>Precio (€)*</label>
+                            <label>Precio (€)* <span style="font-weight:400;color:var(--color-text-muted);font-size:0.8rem;">(IVA incluido)</span></label>
                             <input type="number" id="fp-price" value="${p.price.toFixed(2)}" step="0.10" style="width:100%; padding:0.5rem;">
+                        </div>
+                        <div>
+                            <label>IVA*</label>
+                            <select id="fp-iva" style="width:100%; padding:0.5rem;">
+                                ${IVA_RATES.map(r => {
+                                    const cur = Number.isFinite(Number(p.ivaRate)) ? Number(p.ivaRate) : defaultIvaForItem(p);
+                                    return `<option value="${r}" ${cur===r?'selected':''}>${r}%${r===21?' (alcohol)':r===10?' (general hostelería)':''}</option>`;
+                                }).join('')}
+                            </select>
                         </div>
                         <div>
                             <label>Categoría*</label>
@@ -281,6 +292,7 @@ export function renderManageMenu(container, app) {
             document.getElementById('btn-save-form').addEventListener('click', () => {
                 p.name = document.getElementById('fp-name').value.trim();
                 p.price = parseFloat(document.getElementById('fp-price').value) || 0;
+                p.ivaRate = parseFloat(document.getElementById('fp-iva').value);
                 p.status = document.querySelector('input[name="fp-status"]:checked').value;
                 
                 if (!p.name) return alert('El nombre es obligatorio');

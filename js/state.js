@@ -2,6 +2,18 @@ import { storage } from './storage.js';
 import { defaultMenu } from './data.js';
 import { deviceManager } from './device.js';
 import { makeHash, verifyHash } from './crypto.js';
+import { defaultIvaForItem } from './fiscal.js';
+import { applyOrderUpdate } from './orders.js';
+
+// Empleado: campos PÚBLICOS (sincronizan anónimos, los necesita el login rápido)
+// vs. PRIVADOS (datos personales, van en `employees_private` protegido por RLS).
+const EMP_PUBLIC_FIELDS = ['id', 'alias', 'role', 'color', 'active', 'isAdmin', 'favCategory', 'pin', 'pinHash'];
+const EMP_PRIVATE_FIELDS = ['name', 'dni', 'phone', 'rate', 'hireDate'];
+const pick = (obj, keys) => {
+    const o = {};
+    keys.forEach(k => { if (obj[k] !== undefined) o[k] = obj[k]; });
+    return o;
+};
 
 class State {
     constructor() {
@@ -25,22 +37,30 @@ class State {
                     this.notifyListeners('orders');
                     return;
                 }
+                // Empleados: parte pública (anónima) + parte privada (DNI/teléfono/
+                // tarifa, protegida). Se fusionan en memoria para la UI.
+                if (message.key === 'employees') {
+                    const priv = this._privateById || {};
+                    this.employees = (message.state || []).map(e => ({ ...e, ...(priv[e.id] || {}) }));
+                    this.notifyListeners('employees');
+                    return;
+                }
+                if (message.key === 'employees_private') {
+                    this._privateById = message.state || {};
+                    this.employees = (this.employees || []).map(e => ({ ...e, ...(this._privateById[e.id] || {}) }));
+                    this.notifyListeners('employees');
+                    return;
+                }
                 this[message.key] = message.state;
                 this.notifyListeners(message.key);
             }
         });
     }
 
-    // Inserta/actualiza/elimina una comanda concreta en el array en memoria.
+    // Inserta/actualiza/elimina una comanda concreta en el array en memoria
+    // (delegado en la función pura de orders.js, que está cubierta por tests).
     applyOrderUpdate(id, order, deleted) {
-        const idx = this.orders.findIndex(o => o.id === id);
-        if (deleted || order == null) {
-            if (idx > -1) this.orders.splice(idx, 1);
-        } else if (idx > -1) {
-            this.orders[idx] = order;
-        } else {
-            this.orders.push(order);
-        }
+        applyOrderUpdate(this.orders, id, order, deleted);
     }
 
     // Guarda una comanda como su propia fila; elimina su fila.
@@ -107,11 +127,26 @@ class State {
     }
 
     loadInitialEmployees() {
+        // Datos personales (DNI/teléfono/tarifa) en clave aparte protegida por RLS.
+        const priv = storage.loadState('employees_private') || {};
+        this._privateById = priv;
         const stored = storage.loadState('employees');
-        if (stored && stored.length > 0) return stored;
-        return [
+        const base = (stored && stored.length > 0) ? stored : [
             { id: 'admin', name: 'Administrador', alias: 'Admin', role: 'Camarero', color: '#10B981', pin: '1234', active: true, favCategory: '⭐', isAdmin: true, dni: '', phone: '', hireDate: '', rate: 0 }
         ];
+        // Fusión pública + privada para que la UI vea el empleado completo.
+        return base.map(e => ({ ...e, ...(priv[e.id] || {}) }));
+    }
+
+    // Persiste empleados separando la parte pública (anónima) de la privada (DNI,
+    // teléfono, tarifa), que se cierra con la cuenta segura (RLS como `payments`).
+    _persistEmployees() {
+        const pub = this.employees.map(e => pick(e, EMP_PUBLIC_FIELDS));
+        const priv = {};
+        this.employees.forEach(e => { priv[e.id] = pick(e, EMP_PRIVATE_FIELDS); });
+        this._privateById = priv;
+        storage.saveState('employees', pub);
+        storage.saveState('employees_private', priv);
     }
 
     loadInitialPayments() {
@@ -152,7 +187,13 @@ class State {
     }
 
     loadInitialMenu() {
-        return storage.loadState('menu') || defaultMenu;
+        const menu = storage.loadState('menu') || defaultMenu;
+        // Migración de IVA: a los productos sin `ivaRate` se les asigna el tipo por
+        // defecto (10% hostelería, 21% bebida alcohólica). Editable luego en la carta.
+        return menu.map(m => ({
+            ...m,
+            ivaRate: Number.isFinite(Number(m.ivaRate)) ? Number(m.ivaRate) : defaultIvaForItem(m)
+        }));
     }
 
     subscribe(callback) {
@@ -221,17 +262,16 @@ class State {
         const index = this.employees.findIndex(e => e.id === id);
         if (index > -1) {
             this.employees[index] = { ...this.employees[index], ...data };
-            storage.saveState('employees', this.employees);
-            this.notifyListeners('employees');
         } else {
-            storage.saveState('employees', this.employees);
-            this.notifyListeners('employees');
+            this.employees.push({ ...data });
         }
+        this._persistEmployees();
+        this.notifyListeners('employees');
     }
 
     deleteEmployee(id) {
         this.employees = this.employees.filter(e => e.id !== id);
-        storage.saveState('employees', this.employees);
+        this._persistEmployees();
         this.notifyListeners('employees');
     }
 

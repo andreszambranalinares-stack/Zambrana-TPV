@@ -131,6 +131,17 @@ export class SupabaseProvider extends SyncProvider {
         }
     }
 
+    // Contador atómico en la nube (numeración de factura legal y sin colisiones
+    // entre dispositivos). Usa la función SQL next_counter (ver docs/SUPABASE_SETUP.md).
+    async nextCounter(name) {
+        const { data, error } = await this.client.rpc('next_counter', {
+            p_tenant: this.tenant,
+            p_name: name
+        });
+        if (error) throw error;
+        return Number(data);
+    }
+
     // ── Outbox: cola de envíos pendientes cuando no hay red ────────────────────
     _readOutbox() {
         try { return JSON.parse(localStorage.getItem(OUTBOX_KEY) || '{}'); }

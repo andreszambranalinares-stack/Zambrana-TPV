@@ -3,6 +3,7 @@ import { tickets } from '../tickets.js';
 import { storage } from '../storage.js';
 import { deviceManager } from '../device.js';
 import { renderAdmin, renderPayroll } from './admin.js';
+import { buildShiftReport } from '../reports.js';
 
 export function renderDesktop(container, app) {
     let activeSection = 'mesas'; // mesas | comandas | carta | informes | ajustes
@@ -401,7 +402,7 @@ export function renderDesktop(container, app) {
                     if (existing) {
                         existing.qty++;
                     } else {
-                        pending.push({ id: itemId, name: menuItem.name, price: menuItem.price, qty: 1, category: menuItem.category });
+                        pending.push({ id: itemId, name: menuItem.name, price: menuItem.price, qty: 1, category: menuItem.category, ivaRate: menuItem.ivaRate });
                     }
                     renderMesaDetail(tableId);
                 });
@@ -525,6 +526,33 @@ export function renderDesktop(container, app) {
         `;
     };
 
+    const renderInformesBreakdown = () => {
+        const r = buildShiftReport({
+            tickets: tickets.getAllTickets(),
+            payments: globalState.payments,
+            shift: globalState.shift
+        });
+        const money = (v) => `${(v || 0).toFixed(2)} €`;
+        const methodLabels = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', dividida: 'Dividido/Mixto', otro: 'Otro' };
+        const card = (title, rows) => `
+            <div class="desktop-col" style="min-height:0;">
+                <div class="desktop-col-header">${title}</div>
+                <div class="desktop-col-body" style="padding:1rem;">
+                    ${rows || '<div style="color:var(--color-text-muted);">Sin datos</div>'}
+                </div>
+            </div>`;
+        const line = (a, b) => `<div style="display:flex;justify-content:space-between;gap:1rem;padding:.25rem 0;border-bottom:1px solid var(--color-border);"><span>${a}</span><span style="font-weight:600;">${b}</span></div>`;
+
+        return `
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1.5rem;margin-top:1.5rem;">
+                ${card('Método de pago', Object.entries(r.byMethod).map(([k, v]) => line(methodLabels[k] || k, money(v))).join(''))}
+                ${card('IVA', r.iva.map(x => line(`Base ${x.rate}% / cuota`, `${money(x.base)} / ${money(x.cuota)}`)).join(''))}
+                ${card('Top productos', r.topProducts.slice(0, 10).map(p => line(`${p.name} ×${p.qty}`, money(p.total))).join(''))}
+                ${card('Por categoría', r.categories.map(c => line(`${c.category} ×${c.qty}`, money(c.total))).join(''))}
+                ${card('Por camarero', r.waiters.map(w => line(`${w.waiter} (${w.count})`, money(w.total))).join(''))}
+            </div>`;
+    };
+
     const renderAjustesSection = () => {
         const panel = document.createElement('div');
         panel.style.cssText = 'padding:1.5rem;flex:1;overflow-y:auto;height:100%;';
@@ -553,8 +581,12 @@ export function renderDesktop(container, app) {
             main.innerHTML = '<div style="flex:1;overflow-y:auto;padding:1.5rem;" id="carta-wrapper"></div>';
         } else if (activeSection === 'informes') {
             main.innerHTML = `<div style="padding:2rem;flex:1;overflow-y:auto;">
-                <h2 style="margin-bottom:1.5rem;">Informes</h2>
+                <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;margin-bottom:1.5rem;">
+                    <h2>Informes de caja</h2>
+                    <button class="btn btn-secondary" onclick="window.showXReport()"><i class='bx bx-expand-alt'></i> Informe completo (X) · Imprimir · CSV</button>
+                </div>
                 <div class="dashboard-grid">${renderResumenDia()}</div>
+                ${renderInformesBreakdown()}
             </div>`;
         }
 

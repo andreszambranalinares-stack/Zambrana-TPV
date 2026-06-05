@@ -1,4 +1,5 @@
 import { storage } from './storage.js';
+import { ivaBreakdown, formatInvoiceNumber } from './fiscal.js';
 
 const BUSINESS_DEFAULTS = {
     name: 'Zambrana',
@@ -127,39 +128,64 @@ export const tickets = {
         this.doPrint(html);
     },
 
-    printCobro(table, orders, grandTotal, method) {
-        const b = this.getBusiness();
+    async printCobro(table, orders, grandTotal, method, opts = {}) {
         const date = new Date();
         const dateStr = date.toLocaleDateString('es-ES');
         const timeStr = date.toLocaleTimeString('es-ES', {hour: '2-digit', minute: '2-digit', second: '2-digit'});
 
+        // Número de factura (secuencial online; provisional offline). En modo
+        // previsualización NO se consume un número real.
+        let invNo = 'DEMO', provisional = false;
+        if (!opts.preview) {
+            try {
+                const inv = await storage.getInvoiceNumber();
+                provisional = inv.provisional;
+                invNo = provisional
+                    ? `PROV-${inv.deviceTag}-${inv.seq}`
+                    : formatInvoiceNumber(inv.seq, date);
+            } catch (e) { invNo = 'S/N'; }
+        }
+
         let itemsHtml = '';
+        const allItems = [];
         orders.forEach(o => {
             o.items.forEach(i => {
+                allItems.push(i);
                 const name = esc(i.name.substring(0, 18).padEnd(18, ' '));
                 const price = (i.price * i.qty).toFixed(2).padStart(6, ' ');
                 itemsHtml += `  ${i.qty}x ${name} ${price}€<br>`;
             });
         });
 
-        const rate = Number(b.ivaRate) || 0;
-        const sub = (grandTotal / (1 + rate / 100)).toFixed(2);
-        const iva = (grandTotal - sub).toFixed(2);
-        const tot = grandTotal.toFixed(2);
+        // Proyección compacta de líneas para los informes (producto / categoría).
+        const lines = allItems.map(i => ({
+            name: i.name, qty: i.qty, price: i.price,
+            category: i.category || 'Otros',
+            ivaRate: Number.isFinite(Number(i.ivaRate)) ? Number(i.ivaRate) : 10
+        }));
 
-        // Ticket de cobro (cliente): cabecera completa con datos fiscales + pie.
+        // Desglose de IVA por tipo (base + cuota). El precio ya lleva el IVA incluido.
+        const fiscal = ivaBreakdown(allItems);
+        const pad = (s) => String(s).padStart(8, ' ');
+        let ivaRows = '';
+        fiscal.rows.forEach(r => {
+            ivaRows += `  Base ${String(r.rate).padStart(2, ' ')}%: ${pad(r.base.toFixed(2))} €<br>`;
+            ivaRows += `  IVA  ${String(r.rate).padStart(2, ' ')}%: ${pad(r.cuota.toFixed(2))} €<br>`;
+        });
+
+        // Ticket de cobro (factura simplificada): cabecera fiscal + nº + desglose IVA + pie.
         const html = `
             <div id="print-area">
-                ${this.buildHeader('TICKET DE COBRO', true)}
+                ${this.buildHeader('FACTURA SIMPLIFICADA', true)}
                 <div style="text-align:left;">
+                    Nº: ${esc(invNo)}${provisional ? ' (provisional)' : ''}<br>
                     Mesa: ${esc(table.id)}         Camarero: ${esc(orders[0]?.waiterName || 'Desconocido')}<br>
                     Fecha: ${dateStr}    Hora: ${timeStr}<br>
                     --------------------------------<br>
                     ${itemsHtml}
                     --------------------------------<br>
-                    SUBTOTAL:              ${sub.padStart(6, ' ')}€<br>
-                    IVA (${rate}%):             ${iva.padStart(6, ' ')}€<br>
-                    TOTAL:                 ${tot.padStart(6, ' ')}€<br>
+                    ${ivaRows}--------------------------------<br>
+                    TOTAL:               ${pad(fiscal.total.toFixed(2))} €<br>
                     --------------------------------<br>
                     MÉTODO DE PAGO: ${esc(method.toUpperCase())}<br>
                 </div>
@@ -167,15 +193,22 @@ export const tickets = {
             </div>
         `;
 
-        this.saveTicket({
-            id: 'C' + Date.now(),
-            type: 'cobro',
-            tableId: table.id,
-            waiter: orders[0]?.waiterName,
-            timestamp: Date.now(),
-            total: grandTotal,
-            htmlContent: html
-        });
+        if (!opts.preview) {
+            this.saveTicket({
+                id: 'C' + Date.now(),
+                type: 'cobro',
+                invoiceNumber: invNo,
+                provisional,
+                tableId: table.id,
+                waiter: orders[0]?.waiterName,
+                method,
+                timestamp: Date.now(),
+                total: grandTotal,
+                iva: fiscal,
+                lines,
+                htmlContent: html
+            });
+        }
 
         this.doPrint(html);
     },
