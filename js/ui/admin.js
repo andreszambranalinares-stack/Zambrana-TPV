@@ -215,10 +215,71 @@ async function manageSecureAccount() {
     });
 }
 
+// ── Datos del negocio que salen en el ticket (logo + fiscales) ───────────────
+function editBusinessData() {
+    const b = globalState.business || {};
+    const html = `
+        <div style="display:flex;flex-direction:column;gap:.6rem;">
+            <div style="font-size:.8rem;color:var(--color-text-muted);">Estos datos aparecen impresos en el ticket de cobro junto a tu logo.</div>
+            <label>Nombre comercial:</label>
+            <input type="text" id="biz-name" value="${(b.name||'').replace(/"/g,'&quot;')}" placeholder="Restaurante Zambrana" style="padding:.5rem;">
+            <label>Razón social (opcional):</label>
+            <input type="text" id="biz-legal" value="${(b.legalName||'').replace(/"/g,'&quot;')}" placeholder="Zambrana S.L." style="padding:.5rem;">
+            <label>CIF / NIF:</label>
+            <input type="text" id="biz-cif" value="${(b.cif||'').replace(/"/g,'&quot;')}" placeholder="B12345678" style="padding:.5rem;">
+            <label>Dirección:</label>
+            <input type="text" id="biz-address" value="${(b.address||'').replace(/"/g,'&quot;')}" placeholder="C/ Mayor, 1" style="padding:.5rem;">
+            <label>Población / CP:</label>
+            <input type="text" id="biz-city" value="${(b.city||'').replace(/"/g,'&quot;')}" placeholder="28080 Madrid" style="padding:.5rem;">
+            <div style="display:flex;gap:.6rem;">
+                <div style="flex:1;"><label>Teléfono:</label><input type="tel" id="biz-phone" value="${(b.phone||'').replace(/"/g,'&quot;')}" placeholder="600 000 000" style="padding:.5rem;width:100%;"></div>
+                <div style="flex:1;"><label>IVA (%):</label><input type="number" id="biz-iva" value="${b.ivaRate ?? 10}" min="0" max="100" step="0.1" style="padding:.5rem;width:100%;"></div>
+            </div>
+            <label>Email (opcional):</label>
+            <input type="email" id="biz-email" value="${(b.email||'').replace(/"/g,'&quot;')}" placeholder="hola@zambrana.com" style="padding:.5rem;">
+            <label>Texto de pie (agradecimiento):</label>
+            <input type="text" id="biz-footer" value="${(b.footer||'').replace(/"/g,'&quot;')}" placeholder="¡Gracias por su visita!" style="padding:.5rem;">
+            <label style="display:flex;align-items:center;gap:.5rem;margin-top:.3rem;">
+                <input type="checkbox" id="biz-logo" ${b.showLogo !== false ? 'checked' : ''}> Mostrar logo en el ticket
+            </label>
+        </div>`;
+    const modalId = showModal('Datos del negocio (ticket)', html, `<button class="btn btn-secondary" id="btn-biz-preview">Previsualizar</button><button class="btn btn-primary" id="btn-biz-save">Guardar</button>`);
+
+    const collect = () => ({
+        name: document.getElementById('biz-name').value.trim(),
+        legalName: document.getElementById('biz-legal').value.trim(),
+        cif: document.getElementById('biz-cif').value.trim(),
+        address: document.getElementById('biz-address').value.trim(),
+        city: document.getElementById('biz-city').value.trim(),
+        phone: document.getElementById('biz-phone').value.trim(),
+        email: document.getElementById('biz-email').value.trim(),
+        footer: document.getElementById('biz-footer').value.trim() || '¡Gracias por su visita!',
+        ivaRate: parseFloat(document.getElementById('biz-iva').value) || 0,
+        showLogo: document.getElementById('biz-logo').checked
+    });
+
+    document.getElementById('btn-biz-save').addEventListener('click', () => {
+        globalState.updateBusiness(collect());
+        closeModal(modalId);
+        if (window.app) window.app.showToast('🧾 Datos del ticket guardados');
+    });
+
+    document.getElementById('btn-biz-preview').addEventListener('click', () => {
+        globalState.updateBusiness(collect()); // guarda para que el preview refleje lo escrito
+        const demoTable = { id: 0 };
+        const demoOrders = [{ waiterName: 'Demostración', items: [
+            { name: 'Plato de ejemplo', qty: 1, price: 12.5 },
+            { name: 'Bebida', qty: 2, price: 2.5 }
+        ] }];
+        tickets.printCobro(demoTable, demoOrders, 17.5, 'efectivo');
+    });
+}
+
 window.exportBackup = exportBackup;
 window.triggerImport = triggerImport;
 window.changeAdminPassword = changeAdminPassword;
 window.manageSecureAccount = manageSecureAccount;
+window.editBusinessData = editBusinessData;
 
 // ── Pantalla dedicada de Personal / Pagos (usada por el panel de escritorio) ──
 export function renderPayroll(container, app) {
@@ -440,6 +501,7 @@ export function renderAdmin(container, app) {
                 <button class="btn btn-secondary" id="btn-shift-history" style="width:100%;"><i class='bx bx-history'></i> Historial de Turnos</button>
                 <button class="btn btn-secondary" onclick="window.exportBackup()" style="width:100%;"><i class='bx bx-download'></i> Exportar copia de seguridad</button>
                 <button class="btn btn-secondary" onclick="window.triggerImport()" style="width:100%;"><i class='bx bx-upload'></i> Importar copia</button>
+                <button class="btn btn-secondary" onclick="window.editBusinessData()" style="width:100%;"><i class='bx bx-receipt'></i> Datos del negocio (ticket)</button>
                 <button class="btn btn-secondary" onclick="window.changeAdminPassword()" style="width:100%;"><i class='bx bx-lock-alt'></i> Cambiar contraseña admin</button>
                 <button class="btn btn-secondary" onclick="window.manageSecureAccount()" style="width:100%;"><i class='bx bx-shield-quarter'></i> Cuenta segura (datos personales)</button>
             </div>
@@ -661,6 +723,7 @@ export function renderAdmin(container, app) {
                         <div style="display:flex;flex-direction:column;gap:0.5rem;">
                             <button class="btn btn-secondary" onclick="window.exportBackup()" style="width:100%;"><i class='bx bx-download'></i> Exportar copia</button>
                             <button class="btn btn-secondary" onclick="window.triggerImport()" style="width:100%;"><i class='bx bx-upload'></i> Importar copia</button>
+                            <button class="btn btn-secondary" onclick="window.editBusinessData()" style="width:100%;"><i class='bx bx-receipt'></i> Datos del negocio (ticket)</button>
                             <button class="btn btn-secondary" onclick="window.changeAdminPassword()" style="width:100%;"><i class='bx bx-lock-alt'></i> Cambiar contraseña admin</button>
                             <button class="btn btn-secondary" onclick="window.manageSecureAccount()" style="width:100%;"><i class='bx bx-shield-quarter'></i> Cuenta segura</button>
                         </div>

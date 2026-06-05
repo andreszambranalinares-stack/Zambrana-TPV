@@ -11,6 +11,7 @@ class State {
         this.menu = this.loadInitialMenu();
         this.employees = this.loadInitialEmployees();
         this.payments = this.loadInitialPayments();
+        this.business = this.loadInitialBusiness();
         this.shift = this.loadInitialShift();
         this.isKitchenPaused = false;
         this.listeners = [];
@@ -115,6 +116,30 @@ class State {
 
     loadInitialPayments() {
         return storage.loadState('payments') || [];
+    }
+
+    // Datos del negocio que salen impresos en el ticket (logo + fiscales).
+    loadInitialBusiness() {
+        const stored = storage.loadState('business') || {};
+        return {
+            name: 'Zambrana',
+            legalName: '',
+            cif: '',
+            address: '',
+            city: '',
+            phone: '',
+            email: '',
+            footer: '¡Gracias por su visita!',
+            showLogo: true,
+            ivaRate: 10,
+            ...stored
+        };
+    }
+
+    updateBusiness(data) {
+        this.business = { ...this.business, ...data };
+        storage.saveState('business', this.business);
+        this.notifyListeners('business');
     }
 
     loadInitialShift() {
