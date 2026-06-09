@@ -1,0 +1,8 @@
+# Claude Code internals
+.claude/
+
+# Node
+node_modules/
+dist/
+.env
+.env.local
