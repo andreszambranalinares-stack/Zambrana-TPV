@@ -1,0 +1,105 @@
+import { useAccountStore } from './accountStore'
+import type { ClosedTrade } from '@/types'
+
+export interface JournalStats {
+  totalTrades: number
+  wins: number
+  losses: number
+  winRate: number           // 0–100 %
+  avgProfit: number         // avg net P&L on winning trades
+  avgLoss: number           // avg net P&L on losing trades (negative)
+  profitFactor: number      // totalProfit / |totalLoss|, or Infinity if no losses
+  currentStreak: number     // positive = consecutive wins, negative = consecutive losses
+  maxWinStreak: number
+  maxLossStreak: number
+  totalNetPnL: number
+  equityCurve: Array<{ time: number; value: number }> // time in seconds, value = equity
+}
+
+export function calcJournalStats(
+  trades: ClosedTrade[],
+  initialBalance: number,
+): JournalStats {
+  if (trades.length === 0) {
+    return {
+      totalTrades: 0,
+      wins: 0,
+      losses: 0,
+      winRate: 0,
+      avgProfit: 0,
+      avgLoss: 0,
+      profitFactor: 0,
+      currentStreak: 0,
+      maxWinStreak: 0,
+      maxLossStreak: 0,
+      totalNetPnL: 0,
+      equityCurve: [],
+    }
+  }
+
+  const sorted = [...trades].sort((a, b) => a.closedAt - b.closedAt)
+  const wins = sorted.filter((t) => t.netPnL > 0)
+  const losses = sorted.filter((t) => t.netPnL <= 0)
+
+  const totalProfit = wins.reduce((s, t) => s + t.netPnL, 0)
+  const totalLoss = Math.abs(losses.reduce((s, t) => s + t.netPnL, 0))
+  const profitFactor = totalLoss === 0 ? (totalProfit > 0 ? Infinity : 0) : totalProfit / totalLoss
+
+  // Streak calculation
+  let currentStreak = 0
+  let maxWinStreak = 0
+  let maxLossStreak = 0
+  let streak = 0
+
+  for (const trade of sorted) {
+    if (trade.netPnL > 0) {
+      streak = streak > 0 ? streak + 1 : 1
+    } else {
+      streak = streak < 0 ? streak - 1 : -1
+    }
+    if (streak > maxWinStreak) maxWinStreak = streak
+    if (streak < -maxLossStreak) maxLossStreak = -streak
+    currentStreak = streak
+  }
+
+  // Equity curve: starting balance + cumulative netPnL per trade
+  let cumulative = 0
+  const equityCurve = sorted.map((t) => {
+    cumulative += t.netPnL
+    return {
+      time: Math.floor(t.closedAt / 1000),
+      value: initialBalance + cumulative,
+    }
+  })
+
+  // Prepend the starting point
+  if (sorted.length > 0) {
+    equityCurve.unshift({
+      time: Math.floor(sorted[0].openedAt / 1000) - 1,
+      value: initialBalance,
+    })
+  }
+
+  return {
+    totalTrades: sorted.length,
+    wins: wins.length,
+    losses: losses.length,
+    winRate: (wins.length / sorted.length) * 100,
+    avgProfit: wins.length > 0 ? totalProfit / wins.length : 0,
+    avgLoss: losses.length > 0 ? -(totalLoss / losses.length) : 0,
+    profitFactor,
+    currentStreak,
+    maxWinStreak,
+    maxLossStreak,
+    totalNetPnL: totalProfit - totalLoss,
+    equityCurve,
+  }
+}
+
+export function useJournalStats(): JournalStats {
+  const { closedTrades, initialBalance } = useAccountStore((s) => ({
+    closedTrades: s.closedTrades,
+    initialBalance: s.initialBalance,
+  }))
+  return calcJournalStats(closedTrades, initialBalance)
+}
