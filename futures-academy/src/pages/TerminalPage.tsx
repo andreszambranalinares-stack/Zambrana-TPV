@@ -1,12 +1,26 @@
+import { useEffect, useRef, useState } from 'react'
 import { useOrderExecution } from '@/hooks/useOrderExecution'
+import { useAccountStore } from '@/store/accountStore'
 import { ChartToolbar } from '@/components/chart/ChartToolbar'
 import { TradingChart } from '@/components/chart/TradingChart'
 import { OrderPanel } from '@/components/orderPanel/OrderPanel'
 import { PositionsTable } from '@/components/positions/PositionsTable'
 import { AccountPanel } from '@/components/account/AccountPanel'
+import { Toast } from '@/components/ui/Toast'
 
 export function TerminalPage() {
   useOrderExecution()
+
+  const lastLiquidationAt = useAccountStore((s) => s.lastLiquidationAt)
+  const [showLiqToast, setShowLiqToast] = useState(false)
+  const prevLiqRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    if (lastLiquidationAt && lastLiquidationAt !== prevLiqRef.current) {
+      prevLiqRef.current = lastLiquidationAt
+      setShowLiqToast(true)
+    }
+  }, [lastLiquidationAt])
 
   return (
     <div className="flex flex-col h-full">
@@ -31,6 +45,15 @@ export function TerminalPage() {
           </div>
         </div>
       </div>
+
+      {showLiqToast && (
+        <Toast
+          message="⚠ Cuenta liquidada. Margen de mantenimiento insuficiente. Todas las posiciones han sido cerradas."
+          type="error"
+          onDismiss={() => setShowLiqToast(false)}
+          duration={8000}
+        />
+      )}
     </div>
   )
 }

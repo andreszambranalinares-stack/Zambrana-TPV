@@ -5,9 +5,9 @@ import { useRiskGuard } from '@/hooks/useRiskGuard'
 import { Modal } from '@/components/ui/Modal'
 import { CONTRACT_SPECS } from '@/constants/contracts'
 import { checkMarginSufficiency, calcRequiredMargin } from '@/services/futuresEngine'
-import type { ContractSymbol, OrderSide } from '@/types'
+import type { ContractSymbol, OrderSide, OrderType } from '@/types'
 
-const MICRO_SYMBOLS: ContractSymbol[] = ['MNQ', 'MES']
+const ALL_SYMBOLS: ContractSymbol[] = ['MNQ', 'MES', 'NQ', 'ES']
 
 export function OrderPanel() {
   const { activeSymbol, setActiveSymbol, currentPrices } = useMarketStore()
@@ -18,6 +18,9 @@ export function OrderPanel() {
   const [size, setSize] = useState(1)
   const [slPrice, setSlPrice] = useState('')
   const [tpPrice, setTpPrice] = useState('')
+  const [orderType, setOrderType] = useState<OrderType>('MARKET')
+  const [limitPrice, setLimitPrice] = useState('')
+  const [stopPrice, setStopPrice] = useState('')
   const [showRiskModal, setShowRiskModal] = useState(false)
   const [pendingSubmit, setPendingSubmit] = useState(false)
   const [error, setError] = useState('')
@@ -62,10 +65,15 @@ export function OrderPanel() {
 
   function executeOrder(fillPrice: number) {
     const orderId = crypto.randomUUID()
+    // For Limit/Stop orders we use the current price as fill price for now.
+    // TODO (Phase 4): implement a proper pending order queue so limit/stop orders
+    // are only filled when price reaches the specified level.
     account.openPosition(orderId, activeSymbol, side, size, fillPrice, slNum, tpNum)
     // Reset form
     setSlPrice('')
     setTpPrice('')
+    setLimitPrice('')
+    setStopPrice('')
     setSize(1)
     setPendingSubmit(false)
   }
@@ -78,26 +86,12 @@ export function OrderPanel() {
   // Suppress unused variable warning
   void pendingSubmit
 
+  const orderTypeLabel =
+    orderType === 'MARKET' ? 'Mercado' : orderType === 'LIMIT' ? 'Límite' : 'Stop'
+
   return (
     <div className="bg-terminal-surface border border-terminal-border rounded-lg p-4">
       <h3 className="text-terminal-text text-sm font-semibold mb-3">Nueva Orden</h3>
-
-      {/* Contract selector — micro only */}
-      <div className="flex gap-1 mb-3">
-        {MICRO_SYMBOLS.map((sym) => (
-          <button
-            key={sym}
-            onClick={() => setActiveSymbol(sym)}
-            className={`flex-1 py-1.5 text-xs font-medium rounded transition-colors ${
-              activeSymbol === sym
-                ? 'bg-terminal-accent text-white'
-                : 'bg-terminal-bg text-terminal-muted hover:text-terminal-text border border-terminal-border'
-            }`}
-          >
-            {sym}
-          </button>
-        ))}
-      </div>
 
       {/* Buy/Sell */}
       <div className="flex gap-1 mb-3">
@@ -123,6 +117,40 @@ export function OrderPanel() {
         </button>
       </div>
 
+      {/* Order type selector */}
+      <div className="flex gap-1 mb-3">
+        {(['MARKET', 'LIMIT', 'STOP'] as const).map((ot) => (
+          <button
+            key={ot}
+            onClick={() => setOrderType(ot)}
+            className={`flex-1 py-1.5 text-xs rounded transition-colors ${
+              orderType === ot
+                ? 'bg-terminal-accent/20 text-terminal-accent border border-terminal-accent/50'
+                : 'text-terminal-muted border border-terminal-border hover:text-terminal-text'
+            }`}
+          >
+            {ot === 'MARKET' ? 'Mercado' : ot === 'LIMIT' ? 'Límite' : 'Stop'}
+          </button>
+        ))}
+      </div>
+
+      {/* Contract selector — all 4 contracts */}
+      <div className="flex gap-1 mb-3">
+        {ALL_SYMBOLS.map((sym) => (
+          <button
+            key={sym}
+            onClick={() => setActiveSymbol(sym)}
+            className={`flex-1 py-1.5 text-xs font-medium rounded transition-colors ${
+              activeSymbol === sym
+                ? 'bg-terminal-accent text-white'
+                : 'bg-terminal-bg text-terminal-muted hover:text-terminal-text border border-terminal-border'
+            }`}
+          >
+            {sym}
+          </button>
+        ))}
+      </div>
+
       {/* Contracts */}
       <div className="mb-3">
         <label className="text-terminal-muted text-xs mb-1 block">Contratos</label>
@@ -140,6 +168,34 @@ export function OrderPanel() {
           </p>
         )}
       </div>
+
+      {/* Conditional price inputs for Limit/Stop */}
+      {orderType === 'LIMIT' && (
+        <div className="mb-3">
+          <label className="text-terminal-muted text-xs mb-1 block">Precio límite</label>
+          <input
+            type="number"
+            step="0.25"
+            value={limitPrice}
+            onChange={(e) => setLimitPrice(e.target.value)}
+            placeholder="Precio de ejecución límite"
+            className="w-full bg-terminal-bg border border-terminal-border rounded px-3 py-2 text-terminal-text text-sm focus:outline-none focus:border-terminal-accent"
+          />
+        </div>
+      )}
+      {orderType === 'STOP' && (
+        <div className="mb-3">
+          <label className="text-terminal-muted text-xs mb-1 block">Precio stop</label>
+          <input
+            type="number"
+            step="0.25"
+            value={stopPrice}
+            onChange={(e) => setStopPrice(e.target.value)}
+            placeholder="Activar al tocar este precio"
+            className="w-full bg-terminal-bg border border-terminal-border rounded px-3 py-2 text-terminal-text text-sm focus:outline-none focus:border-terminal-accent"
+          />
+        </div>
+      )}
 
       {/* Precio actual */}
       {currentPrice && (
@@ -244,7 +300,7 @@ export function OrderPanel() {
           ? 'Establece un Stop Loss'
           : !marginCheck.canOpen
             ? 'Margen insuficiente'
-            : `${side === 'BUY' ? 'Comprar' : 'Vender'} ${size} ${activeSymbol}`}
+            : `${side === 'BUY' ? 'Comprar' : 'Vender'} ${size} ${activeSymbol} (${orderTypeLabel})`}
       </button>
 
       {/* Risk warning modal */}

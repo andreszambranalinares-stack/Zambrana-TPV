@@ -16,6 +16,7 @@ interface AccountState {
   closedTrades: ClosedTrade[]
   peakEquity: number
   maxDrawdown: number
+  lastLiquidationAt: number | null
 
   // Computed helpers (derived on access via get())
   getEquity: () => number
@@ -48,6 +49,7 @@ export const useAccountStore = create<AccountState>()(
       closedTrades: [],
       peakEquity: DEFAULT_BALANCE,
       maxDrawdown: 0,
+      lastLiquidationAt: null,
 
       getEquity: () => {
         const state = get()
@@ -192,6 +194,7 @@ export const useAccountStore = create<AccountState>()(
         for (const pos of positions) {
           closePosition(pos.id, currentPrice, 'LIQUIDATION')
         }
+        set({ lastLiquidationAt: Date.now() })
       },
 
       resetAccount: (newBalance = DEFAULT_BALANCE) => {
@@ -202,6 +205,7 @@ export const useAccountStore = create<AccountState>()(
           closedTrades: [],
           peakEquity: newBalance,
           maxDrawdown: 0,
+          lastLiquidationAt: null,
         })
       },
     }),
@@ -214,6 +218,7 @@ export const useAccountStore = create<AccountState>()(
         closedTrades: state.closedTrades,
         peakEquity: state.peakEquity,
         maxDrawdown: state.maxDrawdown,
+        lastLiquidationAt: state.lastLiquidationAt,
       }),
     },
   ),
