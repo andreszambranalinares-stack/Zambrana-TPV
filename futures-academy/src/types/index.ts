@@ -82,3 +82,40 @@ export interface Route {
   label: string
   icon: string
 }
+
+export interface QuizQuestion {
+  id: string
+  question: string
+  options: string[]
+  correctIndex: number
+  explanation: string
+}
+
+export interface LessonExercise {
+  instruction: string
+  ctaLabel: string
+  ctaRoute: string
+}
+
+export interface TheoryBlock {
+  heading?: string
+  body: string
+}
+
+export interface Lesson {
+  id: number
+  title: string
+  icon: string
+  summary: string
+  theoryBlocks: TheoryBlock[]
+  quiz: QuizQuestion[]
+  exercise: LessonExercise
+}
+
+export interface LessonProgress {
+  lessonId: number
+  theoryRead: boolean
+  quizPassed: boolean
+  exerciseAttempted: boolean
+  completedAt?: number
+}
