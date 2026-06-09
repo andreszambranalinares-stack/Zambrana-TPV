@@ -30,7 +30,7 @@ export default function App() {
       case 'terminal': return <TerminalPage />
       case 'cuenta': return <AccountPage />
       case 'diario': return <JournalPage />
-      case 'academia': return <AcademyPage />
+      case 'academia': return <AcademyPage onNavigate={navigate} />
       case 'replay': return <ReplayPage />
       default: return <TerminalPage />
     }
