@@ -23,16 +23,17 @@ export function TerminalPage() {
   }, [lastLiquidationAt])
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full overflow-y-auto lg:overflow-hidden">
       <ChartToolbar />
-      <div className="flex flex-1 min-h-0 gap-0">
+      {/* Móvil: columna (gráfico arriba, panel debajo). Escritorio: fila con panel lateral fijo */}
+      <div className="flex flex-col lg:flex-row flex-1 min-h-0 gap-0">
         {/* Chart area */}
-        <div className="flex-1 min-h-0 min-w-0">
+        <div className="h-[45vh] lg:h-auto lg:flex-1 min-h-0 min-w-0 shrink-0 lg:shrink">
           <TradingChart />
         </div>
 
-        {/* Right panel */}
-        <div className="w-72 xl:w-80 shrink-0 border-l border-terminal-border flex flex-col overflow-y-auto">
+        {/* Panel: lateral en escritorio, sección inferior en móvil */}
+        <div className="w-full lg:w-72 xl:w-80 shrink-0 border-t lg:border-t-0 lg:border-l border-terminal-border flex flex-col lg:overflow-y-auto">
           <div className="p-3 space-y-3">
             <AccountPanel />
             <OrderPanel />
