@@ -62,20 +62,23 @@ export function calcJournalStats(
     currentStreak = streak
   }
 
-  // Equity curve: starting balance + cumulative netPnL per trade
+  // Equity curve: starting balance + cumulative netPnL per trade.
+  // Timestamps must be strictly increasing — two trades closing in the same
+  // second would cause lightweight-charts to throw. Bump by 1s when needed.
   let cumulative = 0
+  let lastTime = -1
   const equityCurve = sorted.map((t) => {
     cumulative += t.netPnL
-    return {
-      time: Math.floor(t.closedAt / 1000),
-      value: initialBalance + cumulative,
-    }
+    let time = Math.floor(t.closedAt / 1000)
+    if (time <= lastTime) time = lastTime + 1
+    lastTime = time
+    return { time, value: initialBalance + cumulative }
   })
 
-  // Prepend the starting point
+  // Prepend the starting point (always 1s before the first trade point)
   if (sorted.length > 0) {
     equityCurve.unshift({
-      time: Math.floor(sorted[0].openedAt / 1000) - 1,
+      time: equityCurve[0].time - 1,
       value: initialBalance,
     })
   }

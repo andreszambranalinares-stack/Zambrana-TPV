@@ -79,24 +79,21 @@ export function EquityCurveChart({ stats }: EquityCurveChartProps) {
     chartRef.current?.timeScale().fitContent()
   }, [stats.equityCurve])
 
-  if (stats.equityCurve.length === 0) {
-    return (
-      <div
-        className="w-full bg-terminal-surface border border-terminal-border rounded-lg flex items-center justify-center"
-        style={{ height: 240 }}
-      >
-        <p className="text-terminal-muted text-sm text-center px-4">
-          Sin datos — cierra tu primera operación para ver la curva de equity
-        </p>
-      </div>
-    )
-  }
-
+  // Always render the container so the mount effect can attach the chart.
+  // The placeholder overlay appears when there are no trades yet.
   return (
     <div
-      ref={containerRef}
-      className="w-full rounded-lg overflow-hidden border border-terminal-border"
+      className="relative w-full rounded-lg overflow-hidden border border-terminal-border"
       style={{ height: 240, background: '#0a0e1a' }}
-    />
+    >
+      <div ref={containerRef} className="w-full h-full" />
+      {stats.equityCurve.length === 0 && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <p className="text-terminal-muted text-sm text-center px-4">
+            Sin datos — cierra tu primera operación para ver la curva de equity
+          </p>
+        </div>
+      )}
+    </div>
   )
 }
