@@ -1,0 +1,16 @@
+# Netlify lee este archivo desde la RAÍZ del repositorio.
+# base = "futures-academy" hace que todo el build ocurra dentro de esa subcarpeta,
+# para no servir el TPV que vive en la raíz.
+[build]
+  base    = "futures-academy"
+  command = "npm run build"
+  publish = "dist"
+
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
+[[redirects]]
+  from   = "/*"
+  to     = "/index.html"
+  status = 200
