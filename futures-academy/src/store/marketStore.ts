@@ -16,10 +16,13 @@ interface MarketState {
   activeSymbol: ContractSymbol
   activeTimeframe: Timeframe
   currentPrices: Partial<Record<Underlying, number>>
+  realDataAvailable: boolean
+  realDataError: string | null
   setMode: (mode: DataMode) => void
   setActiveSymbol: (symbol: ContractSymbol) => void
   setActiveTimeframe: (tf: Timeframe) => void
   setCurrentPrice: (underlying: Underlying, price: number) => void
+  setRealDataAvailable: (available: boolean, error?: string) => void
   getGenerator: (underlying: Underlying) => GBMGenerator
 }
 
@@ -31,6 +34,8 @@ export const useMarketStore = create<MarketState>((set) => ({
   activeSymbol: 'MNQ',
   activeTimeframe: '1m',
   currentPrices: {},
+  realDataAvailable: false,
+  realDataError: null,
   setMode: (mode) => set({ mode }),
   setActiveSymbol: (symbol) => set({ activeSymbol: symbol }),
   setActiveTimeframe: (tf) => set({ activeTimeframe: tf }),
@@ -38,5 +43,7 @@ export const useMarketStore = create<MarketState>((set) => ({
     set((state) => ({
       currentPrices: { ...state.currentPrices, [underlying]: price },
     })),
+  setRealDataAvailable: (available, error) =>
+    set({ realDataAvailable: available, realDataError: error ?? null }),
   getGenerator,
 }))

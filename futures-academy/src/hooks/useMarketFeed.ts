@@ -1,17 +1,22 @@
 import { useEffect, useRef } from 'react'
-import type { ISeriesApi } from 'lightweight-charts'
+import type { ISeriesApi, UTCTimestamp } from 'lightweight-charts'
 import type { OHLCVCandle, Timeframe } from '@/types'
-import type { UTCTimestamp } from 'lightweight-charts'
 import { useMarketStore } from '@/store/marketStore'
 import { CONTRACT_SPECS } from '@/constants/contracts'
+import { fetchRealCandles } from '@/services/marketDataService'
 
 export function useMarketFeed(
   seriesRef: React.RefObject<ISeriesApi<'Candlestick'> | null>,
   symbol: string,
   timeframe: Timeframe,
 ) {
-  const { getGenerator, setCurrentPrice } = useMarketStore()
+  const { getGenerator, setCurrentPrice, mode, setRealDataAvailable } = useMarketStore()
   const initializedRef = useRef(false)
+
+  // Reset initialization when symbol or timeframe changes
+  useEffect(() => {
+    initializedRef.current = false
+  }, [symbol, timeframe, mode])
 
   useEffect(() => {
     const spec = CONTRACT_SPECS[symbol]
@@ -19,7 +24,8 @@ export function useMarketFeed(
 
     const generator = getGenerator(spec.underlying)
 
-    if (!initializedRef.current) {
+    function loadSimulated() {
+      if (initializedRef.current) return
       const historical = generator.getInitialCandles(timeframe, 200)
       if (seriesRef.current) {
         seriesRef.current.setData(
@@ -33,6 +39,31 @@ export function useMarketFeed(
         )
       }
       initializedRef.current = true
+    }
+
+    if (mode === 'REAL') {
+      fetchRealCandles(spec.underlying, timeframe).then((realCandles) => {
+        if (realCandles.length > 0 && seriesRef.current) {
+          seriesRef.current.setData(
+            realCandles.map((c) => ({
+              time: c.time as UTCTimestamp,
+              open: c.open,
+              high: c.high,
+              low: c.low,
+              close: c.close,
+            })),
+          )
+          setRealDataAvailable(true)
+          initializedRef.current = true
+        } else {
+          // Fallback to simulation
+          setRealDataAvailable(false, 'Datos reales no disponibles')
+          loadSimulated()
+        }
+      })
+    } else {
+      setRealDataAvailable(false)
+      loadSimulated()
     }
 
     const candleListener = (candle: OHLCVCandle) => {
@@ -58,5 +89,5 @@ export function useMarketFeed(
       generator.offCandle(timeframe, candleListener)
       generator.offPrice(priceListener)
     }
-  }, [symbol, timeframe, seriesRef, getGenerator, setCurrentPrice])
+  }, [symbol, timeframe, mode, seriesRef, getGenerator, setCurrentPrice, setRealDataAvailable])
 }
