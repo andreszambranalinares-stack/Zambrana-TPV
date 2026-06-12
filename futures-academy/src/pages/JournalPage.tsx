@@ -43,11 +43,9 @@ class JournalErrorBoundary extends Component<
 }
 
 function JournalContent() {
-  const { closedTrades, initialBalance, resetAccount } = useAccountStore((s) => ({
-    closedTrades: s.closedTrades,
-    initialBalance: s.initialBalance,
-    resetAccount: s.resetAccount,
-  }))
+  const closedTrades = useAccountStore((s) => s.closedTrades)
+  const initialBalance = useAccountStore((s) => s.initialBalance)
+  const resetAccount = useAccountStore((s) => s.resetAccount)
   const stats = useJournalStats()
 
   const sorted = [...closedTrades].sort((a, b) => b.closedAt - a.closedAt)
