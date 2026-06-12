@@ -6,7 +6,7 @@ import { PositionOverlay } from './PositionOverlay'
 
 export function TradingChart() {
   const containerRef = useRef<HTMLDivElement>(null!)
-  const { seriesRef } = useChart(containerRef)
+  const { chartRef, seriesRef } = useChart(containerRef)
   const { activeSymbol, activeTimeframe } = useMarketStore()
 
   useMarketFeed(seriesRef, activeSymbol, activeTimeframe)
@@ -18,7 +18,7 @@ export function TradingChart() {
         className="w-full h-full"
         style={{ background: '#0a0e1a' }}
       />
-      <PositionOverlay seriesRef={seriesRef} />
+      <PositionOverlay seriesRef={seriesRef} chartRef={chartRef} containerRef={containerRef} />
     </div>
   )
 }
