@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { useAccountStore } from './accountStore'
 import type { ClosedTrade } from '@/types'
 
@@ -100,9 +101,9 @@ export function calcJournalStats(
 }
 
 export function useJournalStats(): JournalStats {
-  const { closedTrades, initialBalance } = useAccountStore((s) => ({
-    closedTrades: s.closedTrades,
-    initialBalance: s.initialBalance,
-  }))
-  return calcJournalStats(closedTrades, initialBalance)
+  // Use separate scalar selectors to avoid creating new objects on every render,
+  // which would cause Zustand to re-render on every store update.
+  const closedTrades = useAccountStore((s) => s.closedTrades)
+  const initialBalance = useAccountStore((s) => s.initialBalance)
+  return useMemo(() => calcJournalStats(closedTrades, initialBalance), [closedTrades, initialBalance])
 }

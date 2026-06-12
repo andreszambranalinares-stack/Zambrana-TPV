@@ -60,7 +60,7 @@ function JournalContent() {
 
       <div className="mb-6">
         <h3 className="text-sm font-semibold text-terminal-text mb-3">Curva de Equity</h3>
-        <EquityCurveChart stats={stats} initialBalance={initialBalance} />
+        <EquityCurveChart key={stats.totalTrades} stats={stats} initialBalance={initialBalance} />
       </div>
 
       <div>

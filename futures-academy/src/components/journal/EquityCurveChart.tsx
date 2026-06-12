@@ -3,7 +3,6 @@ import {
   createChart,
   AreaSeries,
   type IChartApi,
-  type ISeriesApi,
   type UTCTimestamp,
 } from 'lightweight-charts'
 import type { JournalStats } from '@/store/journalStore'
@@ -13,12 +12,13 @@ interface EquityCurveChartProps {
   initialBalance: number
 }
 
+// Component is keyed on stats.totalTrades from the parent, so it remounts
+// whenever a trade is added/removed. Data is loaded once on mount — no
+// separate data-update effect needed, which avoids infinite-loop risks.
 export function EquityCurveChart({ stats }: EquityCurveChartProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
-  const seriesRef = useRef<ISeriesApi<'Area'> | null>(null)
 
-  // Mount chart once
   useEffect(() => {
     if (!containerRef.current) return
 
@@ -49,7 +49,20 @@ export function EquityCurveChart({ stats }: EquityCurveChartProps) {
     })
 
     chartRef.current = chart
-    seriesRef.current = areaSeries
+
+    if (stats.equityCurve.length > 0) {
+      try {
+        areaSeries.setData(
+          stats.equityCurve.map((p) => ({
+            time: p.time as UTCTimestamp,
+            value: p.value,
+          })),
+        )
+        chart.timeScale().fitContent()
+      } catch (err) {
+        console.error('EquityCurveChart setData error:', err)
+      }
+    }
 
     const ro = new ResizeObserver(() => {
       if (containerRef.current && chartRef.current) {
@@ -60,27 +73,12 @@ export function EquityCurveChart({ stats }: EquityCurveChartProps) {
 
     return () => {
       ro.disconnect()
-      seriesRef.current = null
       chartRef.current = null
       chart.remove()
     }
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // intentionally empty — parent keys on totalTrades to remount when data changes
 
-  // Update data when equity curve changes
-  useEffect(() => {
-    if (!seriesRef.current || stats.equityCurve.length === 0) return
-
-    seriesRef.current.setData(
-      stats.equityCurve.map((p) => ({
-        time: p.time as UTCTimestamp,
-        value: p.value,
-      }))
-    )
-    chartRef.current?.timeScale().fitContent()
-  }, [stats.equityCurve])
-
-  // Always render the container so the mount effect can attach the chart.
-  // The placeholder overlay appears when there are no trades yet.
   return (
     <div
       className="relative w-full rounded-lg overflow-hidden border border-terminal-border"
