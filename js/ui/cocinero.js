@@ -1,5 +1,7 @@
 import { globalState } from '../state.js';
 import { formatTimeElapsed } from './common.js';
+import { tickets } from '../tickets.js';
+import { isAutoPrintEnabled, setAutoPrint, markStationPrinted } from '../print-station.js';
 
 export function renderCocinero(container, app) {
     let timerInterval = null;
@@ -19,7 +21,10 @@ export function renderCocinero(container, app) {
                         <button class="tab-btn" data-filter="Primer plato">Primeros</button>
                         <button class="tab-btn" data-filter="Segundo plato">Segundos</button>
                     </div>
-                    <button class="btn btn-secondary" id="btn-pause-kitchen">Pausar Cocina (Ocupado)</button>
+                    <div style="display:flex; gap:0.5rem;">
+                        <button class="btn btn-secondary" id="btn-autoprint"></button>
+                        <button class="btn btn-secondary" id="btn-pause-kitchen">Pausar Cocina (Ocupado)</button>
+                    </div>
                 </div>
                 <div class="cook-kanban" id="kanban-container">
                     <div class="kanban-col">
@@ -63,6 +68,23 @@ export function renderCocinero(container, app) {
                 document.getElementById('kanban-container').style.opacity = '0.5';
             }
         });
+
+        const btnAP = document.getElementById('btn-autoprint');
+        const refreshAP = () => {
+            const on = isAutoPrintEnabled();
+            btnAP.textContent = on ? '🖨️ Auto-imprimir: ON' : '🖨️ Auto-imprimir: OFF';
+            btnAP.classList.toggle('btn-primary', on);
+            btnAP.classList.toggle('btn-secondary', !on);
+        };
+        btnAP.addEventListener('click', () => {
+            const on = !isAutoPrintEnabled();
+            setAutoPrint(on);
+            // Al activar, marca las comandas ya en pantalla como impresas para no
+            // volcar el backlog: solo se imprimirán las nuevas a partir de ahora.
+            if (on) markStationPrinted('cocina');
+            refreshAP();
+        });
+        refreshAP();
 
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -134,7 +156,14 @@ export function renderCocinero(container, app) {
                 });
             }
         });
-        
+
+        // Reimpresión manual (robustez: atascos, papel agotado). Funciona aunque la
+        // auto-impresión esté desactivada.
+        [...activeOrders, ...readyOrders].forEach(order => {
+            const btn = document.getElementById(`btn-reprint-${order.id}`);
+            if (btn) btn.addEventListener('click', () => tickets.printStationComanda(order));
+        });
+
         updateTimes();
     };
 
@@ -205,7 +234,10 @@ export function renderCocinero(container, app) {
             <div class="ticket-card" id="ticket-${order.id}">
                 <div class="ticket-header">
                     <div class="ticket-table">MESA ${order.tableId} ${tagAdd}</div>
-                    <div class="ticket-time" id="time-${order.id}" ${timeAttr} ${readyAttr}></div>
+                    <div style="display:flex; align-items:center; gap:0.5rem;">
+                        <button class="btn-reprint" id="btn-reprint-${order.id}" title="Reimprimir comanda" style="background:none; border:none; cursor:pointer; font-size:1.1rem; padding:0.1rem 0.3rem;">🖨️</button>
+                        <div class="ticket-time" id="time-${order.id}" ${timeAttr} ${readyAttr}></div>
+                    </div>
                 </div>
                 <div style="font-size:0.8rem; margin-bottom:0.5rem; color:var(--color-text-muted);">
                     Camarero: <strong>${order.waiterName || 'Desconocido'}</strong> | ${new Date(order.timestamp).toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit'})}

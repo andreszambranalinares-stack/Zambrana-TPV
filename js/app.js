@@ -12,6 +12,7 @@ import { initSidebar } from './ui/sidebar.js';
 import { auth } from './auth.js';
 import { deviceManager } from './device.js';
 import { initTour } from './tour.js';
+import { autoPrintFor } from './print-station.js';
 
 class App {
     constructor() {
@@ -59,6 +60,11 @@ class App {
         this.applyTheme(globalState.config.theme);
         globalState.subscribe(() => {
             this.applyTheme(globalState.config.theme);
+            // Auto-impresión de comandas en el dispositivo de estación. Las comandas
+            // nuevas (también las que llegan de otro equipo por Realtime) terminan en
+            // notifyListeners('orders'); aquí se imprimen las pendientes de esta estación.
+            if (this.currentView === 'cocinero') autoPrintFor('cocina');
+            else if (this.currentView === 'barra') autoPrintFor('barra');
         });
         
         this.setupErrorHandling();

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { applyOrderUpdate } from '../js/orders.js';
+import { applyOrderUpdate, selectUnprinted } from '../js/orders.js';
 
 test('inserta una comanda nueva', () => {
     const arr = [];
@@ -38,4 +38,31 @@ test('state nulo (sin order y sin deleted) elimina si existe', () => {
     const arr = [{ id: 'a' }];
     applyOrderUpdate(arr, 'a', null, false);
     assert.deepEqual(arr, []);
+});
+
+// ── selectUnprinted: qué comandas debe imprimir un dispositivo de estación ──────
+const sampleOrders = [
+    { id: 'k1', dest: 'cocina', status: 'en_cocina' },
+    { id: 'k2', dest: 'cocina', status: 'listo' },     // ya no en preparación
+    { id: 'b1', dest: 'barra',  status: 'en_barra' },
+    { id: 'k3', dest: 'cocina', status: 'en_cocina' },
+];
+
+test('selectUnprinted devuelve solo comandas de la estación en preparación', () => {
+    const r = selectUnprinted(sampleOrders, 'cocina', []);
+    assert.deepEqual(r.map(o => o.id), ['k1', 'k3']);
+});
+
+test('selectUnprinted excluye las ya impresas en este equipo', () => {
+    const r = selectUnprinted(sampleOrders, 'cocina', ['k1']);
+    assert.deepEqual(r.map(o => o.id), ['k3']);
+});
+
+test('selectUnprinted separa cocina de barra', () => {
+    const r = selectUnprinted(sampleOrders, 'barra', []);
+    assert.deepEqual(r.map(o => o.id), ['b1']);
+});
+
+test('selectUnprinted tolera entradas vacías', () => {
+    assert.deepEqual(selectUnprinted(undefined, 'cocina', undefined), []);
 });

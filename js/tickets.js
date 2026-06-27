@@ -128,6 +128,51 @@ export const tickets = {
         this.doPrint(html);
     },
 
+    // Comanda de UNA estación (cocina o barra). El `order` ya viene filtrado por
+    // `globalState.createOrders` con solo los ítems de su estación, así que aquí no
+    // se vuelve a separar. Se usa tanto para la impresión automática como para la
+    // reimpresión manual desde la pantalla de Cocina/Barra.
+    printStationComanda(order) {
+        const station = order.dest === 'barra' ? 'BARRA' : 'COCINA';
+
+        let itemsHtml = '';
+        (order.items || []).forEach(i => {
+            const note = i.note ? `<br>     > ${esc(i.note)}` : '';
+            itemsHtml += `  ${i.qty}x ${esc(i.name)}${note}<br>`;
+        });
+
+        const date = new Date(order.timestamp);
+        const dateStr = date.toLocaleDateString('es-ES');
+        const timeStr = date.toLocaleTimeString('es-ES', {hour: '2-digit', minute: '2-digit', second: '2-digit'});
+
+        const html = `
+            <div id="print-area">
+                ${this.buildHeader('COMANDA ' + station, false)}
+                <div style="text-align:left;">
+                    Mesa: ${esc(order.tableId)}         Comensales: ${esc(order.guests)}<br>
+                    Camarero: ${esc(order.waiterName || 'Desconocido')}<br>
+                    Hora: ${timeStr}    Fecha: ${dateStr}<br>
+                    --------------------------------<br>
+                    ${itemsHtml}--------------------------------<br>
+                    ${order.isAdditional ? 'ADICIONAL<br>' : ''}================================
+                </div>
+            </div>
+        `;
+
+        this.saveTicket({
+            id: 'T' + Date.now(),
+            type: 'comanda',
+            station: order.dest,
+            orderId: order.id,
+            tableId: order.tableId,
+            waiter: order.waiterName,
+            timestamp: order.timestamp,
+            htmlContent: html
+        });
+
+        this.doPrint(html);
+    },
+
     async printCobro(table, orders, grandTotal, method, opts = {}) {
         const date = new Date();
         const dateStr = date.toLocaleDateString('es-ES');

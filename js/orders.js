@@ -17,3 +17,14 @@ export function applyOrderUpdate(orders, id, order, deleted) {
     }
     return orders;
 }
+
+// Comandas de una estación ('cocina' | 'barra') que están en preparación y que este
+// dispositivo aún NO ha impreso (su id no está en `printedIds`). Lógica pura para que
+// la auto-impresión por estación sea testeable sin DOM ni localStorage.
+export function selectUnprinted(orders, station, printedIds) {
+    const status = 'en_' + station;
+    const printed = new Set(printedIds || []);
+    return (orders || []).filter(
+        o => o.dest === station && o.status === status && !printed.has(o.id)
+    );
+}

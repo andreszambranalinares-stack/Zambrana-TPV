@@ -1,5 +1,7 @@
 import { globalState } from '../state.js';
 import { formatTimeElapsed } from './common.js';
+import { tickets } from '../tickets.js';
+import { isAutoPrintEnabled, setAutoPrint, markStationPrinted } from '../print-station.js';
 
 export function renderBarra(container, app) {
     let timerInterval = null;
@@ -9,9 +11,10 @@ export function renderBarra(container, app) {
             <div class="bar-view">
                 <div style="display:flex; justify-content:space-between; margin-bottom:1rem; background:var(--color-surface); padding:1rem; border-radius:var(--radius-sm); align-items:center;">
                     <div>
-                        <strong>Pedidos activos:</strong> <span id="stat-active">0</span> | 
+                        <strong>Pedidos activos:</strong> <span id="stat-active">0</span> |
                         <strong>Listos:</strong> <span id="stat-ready">0</span>
                     </div>
+                    <button class="btn btn-secondary" id="btn-autoprint"></button>
                 </div>
                 <div class="cook-kanban" id="kanban-container">
                     <div class="kanban-col">
@@ -25,6 +28,21 @@ export function renderBarra(container, app) {
                 </div>
             </div>
         `;
+
+        const btnAP = document.getElementById('btn-autoprint');
+        const refreshAP = () => {
+            const on = isAutoPrintEnabled();
+            btnAP.textContent = on ? '🖨️ Auto-imprimir: ON' : '🖨️ Auto-imprimir: OFF';
+            btnAP.classList.toggle('btn-primary', on);
+            btnAP.classList.toggle('btn-secondary', !on);
+        };
+        btnAP.addEventListener('click', () => {
+            const on = !isAutoPrintEnabled();
+            setAutoPrint(on);
+            if (on) markStationPrinted('barra');
+            refreshAP();
+        });
+        refreshAP();
 
         updateBoard();
 
@@ -78,7 +96,13 @@ export function renderBarra(container, app) {
             const btn = document.getElementById(`btn-served-${order.id}`);
             if (btn) btn.addEventListener('click', () => globalState.updateOrderStatus(order.id, 'servido'));
         });
-        
+
+        // Reimpresión manual de la comanda (funciona con auto-impresión apagada).
+        [...activeOrders, ...readyOrders].forEach(order => {
+            const btn = document.getElementById(`btn-reprint-${order.id}`);
+            if (btn) btn.addEventListener('click', () => tickets.printStationComanda(order));
+        });
+
         updateTimes();
     };
 
@@ -119,7 +143,10 @@ export function renderBarra(container, app) {
             <div class="ticket-card" id="ticket-${order.id}">
                 <div class="ticket-header">
                     <div class="ticket-table">MESA ${order.tableId} ${tagAdd}</div>
-                    <div class="ticket-time" id="time-${order.id}" ${timeAttr} ${readyAttr}></div>
+                    <div style="display:flex; align-items:center; gap:0.5rem;">
+                        <button class="btn-reprint" id="btn-reprint-${order.id}" title="Reimprimir comanda" style="background:none; border:none; cursor:pointer; font-size:1.1rem; padding:0.1rem 0.3rem;">🖨️</button>
+                        <div class="ticket-time" id="time-${order.id}" ${timeAttr} ${readyAttr}></div>
+                    </div>
                 </div>
                 <div style="font-size:0.8rem; margin-bottom:0.5rem; color:var(--color-text-muted);">
                     Camarero: <strong>${order.waiterName || 'Desconocido'}</strong> | ${new Date(order.timestamp).toLocaleTimeString('es-ES', {hour:'2-digit', minute:'2-digit'})}

@@ -1,126 +1,74 @@
 import { globalState } from '../state.js';
-import { auth } from '../auth.js';
-import { showModal, closeModal } from './common.js';
 import { deviceManager } from '../device.js';
-import { storage } from '../storage.js';
+
+// Mapa rol -> vista correspondiente
+const ROLE_VIEW = {
+    'Camarero': 'camarero',
+    'Cocinero': 'cocinero',
+    'Barra': 'barra',
+    'Administrador': 'camarero'
+};
 
 export function renderHome(container, app) {
     const isShiftOpen = globalState.shift.isOpen;
-    
+
     const kitchenPending = globalState.orders.filter(o => o.status === 'en_cocina').length;
     const barPending = globalState.orders.filter(o => o.status === 'en_barra').length;
 
     let shiftInfo = `<div class="banner" style="background:var(--color-danger); color:white;"><i class="bx bx-error-circle"></i> No hay turno abierto — contacta con el administrador</div>`;
-    let disabledClass = 'disabled';
-    
+
     if (isShiftOpen) {
         const d = new Date(globalState.shift.startTime);
         shiftInfo = `<div style="color:var(--color-free); font-weight:bold; margin-bottom: 2rem;"><i class="bx bxs-circle" style="font-size:0.8rem;vertical-align:middle;"></i> Turno abierto desde ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}</div>`;
-        disabledClass = '';
     }
 
-    const html = `
+    // Empleados activos asignados al turno de hoy
+    const shiftEmps = isShiftOpen
+        ? globalState.employees.filter(e =>
+            e.active && globalState.shift.activeEmployees.includes(e.id))
+        : [];
+
+    let body = '';
+    if (!isShiftOpen) {
+        body = '';
+    } else if (shiftEmps.length === 0) {
+        body = `<div class="banner" style="background:var(--color-bg-soft); color:var(--color-text-muted); margin-top:1rem;"><i class="bx bx-user-x"></i> No hay empleados asignados a este turno — el administrador puede añadirlos.</div>`;
+    } else {
+        body = `<div class="role-cards">` + shiftEmps.map(emp => {
+            const view = ROLE_VIEW[emp.role] || 'camarero';
+            let pending = 0;
+            if (view === 'cocinero') pending = kitchenPending;
+            else if (view === 'barra') pending = barPending;
+            return `
+                <button class="role-card" id="emp-card-${emp.id}" data-emp-id="${emp.id}">
+                    ${pending > 0 ? `<div class="badge">${pending}</div>` : ''}
+                    <span class="emp-avatar" style="background:${emp.color || 'var(--color-primary)'}; width:56px; height:56px; line-height:56px; border-radius:50%; font-size:1.6rem; color:#fff; display:inline-block; text-align:center;">${(emp.alias || '?').charAt(0).toUpperCase()}</span>
+                    <span class="role-title">${emp.alias || emp.name || 'Empleado'}</span>
+                    <span class="role-sub">${emp.role || 'Camarero'}</span>
+                </button>
+            `;
+        }).join('') + `</div>`;
+    }
+
+    container.innerHTML = `
         <div class="home-view">
             <img src="logo.png" alt="Zambrana TPV" style="height: 80px; max-width: 90%; object-fit: contain; margin-bottom: 1rem;">
             ${shiftInfo}
-            <div class="role-cards ${disabledClass}">
-                <button class="role-card" id="role-camarero" data-tour="role-camarero">
-                    <span class="icon"><i class="bx bx-restaurant"></i></span>
-                    <span class="role-title">Camarero</span>
-                    <span class="role-sub">Sala y mesas</span>
-                </button>
-                <button class="role-card" id="role-cocinero" data-tour="role-cocinero">
-                    ${kitchenPending > 0 ? `<div class="badge">${kitchenPending}</div>` : ''}
-                    <span class="icon"><i class="bx bx-bowl-hot"></i></span>
-                    <span class="role-title">Cocinero</span>
-                    <span class="role-sub">${kitchenPending > 0 ? kitchenPending + ' comanda' + (kitchenPending > 1 ? 's' : '') + ' en cola' : 'Comandas de cocina'}</span>
-                </button>
-                <button class="role-card" id="role-barra" data-tour="role-barra">
-                    ${barPending > 0 ? `<div class="badge">${barPending}</div>` : ''}
-                    <span class="icon"><i class="bx bx-drink"></i></span>
-                    <span class="role-title">Barra</span>
-                    <span class="role-sub">${barPending > 0 ? barPending + ' pedido' + (barPending > 1 ? 's' : '') + ' en cola' : 'Bebidas y barra'}</span>
-                </button>
-            </div>
+            ${body}
         </div>
     `;
-    container.innerHTML = html;
 
-    const selectEmployeeAndNavigate = (roleFilter, viewDest) => {
-        if (!isShiftOpen) return;
-        
-        // Find active employees of this role in the current shift
-        const shiftEmps = globalState.employees.filter(e => 
-            e.active && 
-            globalState.shift.activeEmployees.includes(e.id) &&
-            (roleFilter === 'Barra' ? e.role === 'Camarero' || e.role === 'Barra' : e.role === roleFilter)
-        );
+    if (!isShiftOpen) return;
 
-        if (auth.isAdmin()) {
-            app.currentUser = { id: 'admin', alias: 'Administrador', role: roleFilter, favCategory: 'favs', isAdmin: true };
-            deviceManager.linkEmployee('Administrador');
-            app.navigate(viewDest);
-            return;
-        }
-
-        if (shiftEmps.length === 0) {
-            alert(`No hay ningún empleado asignado a ${roleFilter} en este turno.`);
-            return;
-        }
-
-        if (shiftEmps.length === 1 && viewDest === 'barra') {
-            app.currentUser = shiftEmps[0];
-            deviceManager.linkEmployee(shiftEmps[0].alias);
-            app.navigate(viewDest);
-            return;
-        }
-
-        let empsHtml = `<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(120px, 1fr)); gap:1rem; margin-top:1rem;">`;
-        shiftEmps.forEach(emp => {
-            empsHtml += `
-                <div class="emp-card" data-emp-id="${emp.id}">
-                    <div class="emp-avatar" style="background:${emp.color}">${emp.alias.charAt(0)}</div>
-                    <strong>${emp.alias}</strong>
-                </div>
-            `;
-        });
-        empsHtml += `</div>`;
-        empsHtml += `<div style="margin-top:2rem; text-align:center;"><input type="password" id="pin-login" placeholder="PIN rápido" maxlength="4" style="width:150px; text-align:center; font-size:1.2rem; letter-spacing:4px;"></div>`;
-
-        const modalId = showModal(`${roleFilter}s de turno hoy`, empsHtml);
-
-        const tryPin = async (pinStr) => {
-            const emp = await globalState.findEmployeeByPin(shiftEmps, pinStr);
-            if (emp) {
-                app.currentUser = emp;
-                deviceManager.linkEmployee(emp.alias);
-                closeModal(modalId);
-                app.navigate(viewDest);
-            } else {
-                const input = document.getElementById('pin-login');
-                if (input) { input.value = ''; input.placeholder = 'PIN incorrecto'; }
-            }
-        };
-
-        document.getElementById('pin-login').addEventListener('input', (e) => {
-            if (e.target.value.length === 4) tryPin(e.target.value);
-        });
-
-        document.querySelectorAll('.emp-card').forEach(card => {
-            card.addEventListener('click', () => {
-                const id = card.getAttribute('data-emp-id');
-                const emp = shiftEmps.find(e => e.id === id);
-                if (emp) {
-                    app.currentUser = emp;
-                    deviceManager.linkEmployee(emp.alias);
-                    closeModal(modalId);
-                    app.navigate(viewDest);
-                }
-            });
-        });
+    const enterAs = (emp) => {
+        const view = ROLE_VIEW[emp.role] || 'camarero';
+        app.currentUser = emp;
+        deviceManager.linkEmployee(emp.alias || emp.name || 'Empleado');
+        app.navigate(view);
     };
 
-    document.getElementById('role-camarero').addEventListener('click', () => selectEmployeeAndNavigate('Camarero', 'camarero'));
-    document.getElementById('role-cocinero').addEventListener('click', () => selectEmployeeAndNavigate('Cocinero', 'cocinero'));
-    document.getElementById('role-barra').addEventListener('click', () => selectEmployeeAndNavigate('Barra', 'barra'));
+    shiftEmps.forEach(emp => {
+        const card = document.getElementById(`emp-card-${emp.id}`);
+        if (card) card.addEventListener('click', () => enterAs(emp));
+    });
 }
